@@ -26,3 +26,22 @@ sealed interface AppError {
     data class NotFound(val id: String) : AppError
     data class Unknown(val message: String) : AppError
 }
+
+/**
+ * AI-stage failures (ADR-001), mapped from vendor/native errors at the module
+ * edge. Lives here (not in the ai package) because [AppError] is sealed and
+ * Kotlin requires sealed subtypes in the same package.
+ */
+sealed interface AiError : AppError {
+    /** The chosen local model is not downloaded/available yet. */
+    data class ModelUnavailable(val backend: com.vaani.domain.ai.AiBackend, val modelId: String) : AiError
+
+    /** Device cannot run this backend (RAM/ABI/thermal gating, ADR-001 §6). */
+    data class Unsupported(val backend: com.vaani.domain.ai.AiBackend, val reason: String) : AiError
+
+    /** API backend needs a key that is missing or invalid. */
+    data class KeyMissing(val backend: com.vaani.domain.ai.AiBackend) : AiError
+
+    /** Inference started but failed (native crash, OOM, bad audio, timeout). */
+    data class InferenceFailed(val backend: com.vaani.domain.ai.AiBackend, val message: String) : AiError
+}
