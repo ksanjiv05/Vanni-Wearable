@@ -9,5 +9,5 @@ fun PipelineState.chip(): Pair<String, ChipVariant> = when (this) {
     PipelineState.TRANSCRIBING -> "Transcribing" to ChipVariant.Coffee
     PipelineState.ENRICHING -> "Enriching" to ChipVariant.Coffee
     PipelineState.QUEUED -> "Queued" to ChipVariant.Sunken
-    PipelineState.FAILED -> "Failed" to ChipVariant.Slate
+    PipelineState.FAILED -> "Failed" to ChipVariant.Danger
 }

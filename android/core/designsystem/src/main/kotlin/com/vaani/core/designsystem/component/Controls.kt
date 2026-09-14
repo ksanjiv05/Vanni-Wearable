@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -30,6 +31,7 @@ fun VaaniCheckbox(
     val colors = VaaniTheme.colors
     Box(
         modifier = modifier
+            .minimumInteractiveComponentSize()
             .size(boxSize)
             .background(if (checked) colors.coffee else colors.surface, RectangleShape)
             .border(BorderStroke(VaaniSpacing.hairline, if (checked) colors.coffee else colors.muted), RectangleShape)
@@ -57,6 +59,7 @@ fun VaaniToggle(
     val colors = VaaniTheme.colors
     Box(
         modifier = modifier
+            .minimumInteractiveComponentSize()
             .size(width = 48.dp, height = 26.dp)
             .background(if (checked) colors.coffee else colors.sunken, RectangleShape)
             .clickable { onCheckedChange(!checked) },

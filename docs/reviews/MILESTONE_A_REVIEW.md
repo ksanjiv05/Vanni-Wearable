@@ -5,6 +5,9 @@
 **Scope reviewed:** `android/` — build-logic, module graph, `:core:designsystem`, `:core:ui`, `:core:common`, `:domain`, `:feature:library`, `:feature:note`, `:app`.
 **Verdict:** **GO-WITH-FIXES** (see §8). The foundation is genuinely strong. One pattern must be corrected before it is copied into every future feature.
 
+> **Resolution log (post-review):** All P1, P2, and P3 items below have since been
+> addressed except where explicitly marked *Deferred*. See §9 for the status matrix.
+
 ---
 
 ## 1. Verification performed (not just reading)
@@ -137,3 +140,30 @@ The foundation is sound and, in most respects, exemplary. Proceed to the next mi
 2. **P1-2** — Move `FakeNotesRepository` + `SampleData` out of `:domain/main` (to `testFixtures`/`:core:testing`/a fake data module) and relocate the `NotesRepository` Hilt binding out of `:feature:library` into `:app` (or the data module).
 
 P2/P3 items can be scheduled into Milestone B without blocking.
+
+---
+
+## 9. Resolution status matrix (post-review)
+
+| ID | Item | Status | How |
+|---|---|---|---|
+| P1-1 | VMs bypass repository / read `SampleData` | ✅ Fixed | `observeTranscript` added; Library pipeline from `note.pipelineState`; day-bucket from emitted list; NoteDetail id from `SavedStateHandle` (error state on missing); Tasks back-links from `Todo.sourceStartMs`. No `SampleData` refs remain. |
+| P1-2 | Fake + fixtures in `:domain`; binding in a feature | ✅ Fixed | New `:data:notes` module holds `FakeNotesRepository` + fixtures; `@Binds` in `:app/di/DataModule`. `:domain` is pure interface + models. |
+| P1-3 | Pipeline status not modeled on `Note` | ✅ Fixed | `Note.pipelineState` + optional `pipelineProgress`; side-map removed. |
+| P2-1 | Incomplete M3 `ColorScheme` mapping | ✅ Fixed | Both light/dark schemes fully mapped (containers, surfaceVariant, scrim, inverse, outlineVariant, onError…). |
+| P2-2 | Dead `material-icons-extended` dep | ✅ Fixed | Removed from the compose convention plugin + catalog. |
+| P2-3 | `VaaniTypography` bypassed | ◑ Partial | Shared styles (`OverlineStyle`/`MonoStyle`/`SectionHeader`) tokenized; Library card title routed to `MaterialTheme.typography.titleLarge`. Full literal sweep across all 8 screens **deferred** (visual-tuning task; tracked). |
+| P2-4 | Zero `@Preview` | ✅ Fixed | Light+dark previews: component gallery in `:core:designsystem`, `LibraryContent`, `NoteDetailContent`. |
+| P2-5 | No tests | ✅ Fixed | `:core:common` `FormatTest` (6) + `:domain` `OutcomeTest` (6); **12 pass, 0 fail**. JUnit/Turbine/coroutines-test in the catalog. |
+| P2-6 | Locale-unsafe formatting | ✅ Fixed | `Format.kt` + Library use `Locale.ROOT`/`Locale.US`. |
+| P2-7 | Hardcoded presentation values in Note VM | ✅ Fixed | Meta time derived from `createdAt`; player position no longer hardcoded; Library "Transcribing %" from `pipelineProgress`. |
+| P3-1 | Redundant custom `items` | ✅ Fixed | Removed in Note + Tasks; use stdlib `items(list, key)`. |
+| P3-2 | `<48dp` clickable in checkbox/toggle | ✅ Fixed | `minimumInteractiveComponentSize()` baked into `VaaniCheckbox`/`VaaniToggle`. |
+| P3-3 | FAILED chip = Slate (reads as syncing) | ✅ Fixed | Added `ChipVariant.Danger`; FAILED → clay. |
+| P3-4 | No `navArgument` on note route | ✅ Fixed | Declared `navArgument(NOTE_ID_ARG){ StringType }`. |
+| P3-5 | Dead code / unused imports | ✅ Fixed | Removed `snippetOrEmpty()`, unused `HairlineDivider`/`PaddingValues` imports. |
+| P3-6 | No lint gating | ✅ Fixed | `lint { abortOnError; checkDependencies; baseline }` in shared config; per-module baselines committed. |
+| P3-7 | Tap-to-seek affordance stubbed | ⏸ Deferred | Genuinely blocked on the audio player (later milestone); `seekMs` seam already threaded. |
+| P3-8 | DataExtractionRules / MonochromeLauncherIcon | ⏸ Deferred | Phase-4 security items; captured in lint baseline. |
+
+**Verification after fixes:** `assembleDebug` green; `lint` green (gating active); unit tests 12/12 pass; Library/Note/Tasks re-verified on-device (Nothing Phone A063, cream theme).

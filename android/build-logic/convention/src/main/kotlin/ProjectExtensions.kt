@@ -25,6 +25,16 @@ internal fun Project.configureAndroid(commonExtension: CommonExtension<*, *, *, 
             sourceCompatibility = VaaniBuild.JAVA
             targetCompatibility = VaaniBuild.JAVA
         }
+
+        lint {
+            // Fail the build on lint errors; warnings stay advisory for now.
+            abortOnError = true
+            warningsAsErrors = false
+            checkDependencies = true
+            // Baseline lets us gate on new issues without blocking on the
+            // existing (non-critical) warning backlog.
+            baseline = file("lint-baseline.xml")
+        }
     }
 
     extensions.getByType<KotlinAndroidProjectExtension>().compilerOptions {

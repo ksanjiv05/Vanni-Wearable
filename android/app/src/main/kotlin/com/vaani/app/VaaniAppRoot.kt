@@ -12,10 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.vaani.core.designsystem.component.VaaniBottomNav
 import com.vaani.core.designsystem.component.VaaniNavSlot
 import com.vaani.core.designsystem.theme.VaaniTheme
@@ -102,7 +104,10 @@ fun VaaniAppRoot() {
                     composable(Routes.CHAT) {
                         ChatScreen(onBack = { navController.popBackStack() })
                     }
-                    composable(Routes.NOTE) {
+                    composable(
+                        Routes.NOTE,
+                        arguments = listOf(navArgument(NOTE_ID_ARG) { type = NavType.StringType }),
+                    ) {
                         NoteDetailScreen(onBack = { navController.popBackStack() })
                     }
                 },

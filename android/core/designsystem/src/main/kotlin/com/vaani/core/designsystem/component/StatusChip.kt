@@ -14,9 +14,9 @@ import androidx.compose.ui.unit.sp
 import com.vaani.core.designsystem.theme.VaaniTheme
 
 /** Fill variants for status chips (DESIGN_SYSTEM.md §Components). */
-enum class ChipVariant { Sage, Coffee, Slate, Sunken }
+enum class ChipVariant { Sage, Coffee, Slate, Sunken, Danger }
 
-/** Solid, sharp status chip. sage=Ready, coffee=Processing, slate=Syncing, sunken=Queued. */
+/** Solid, sharp status chip. sage=Ready, coffee=Processing, slate=Syncing, sunken=Queued, danger=Failed. */
 @Composable
 fun StatusChip(
     label: String,
@@ -29,6 +29,7 @@ fun StatusChip(
         ChipVariant.Coffee -> colors.coffee to colors.onCoffee
         ChipVariant.Slate -> colors.slate to colors.onCoffee
         ChipVariant.Sunken -> colors.sunken to colors.secondary
+        ChipVariant.Danger -> colors.danger to colors.onCoffee
     }
     Box(
         modifier = modifier

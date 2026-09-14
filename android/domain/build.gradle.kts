@@ -10,4 +10,6 @@ java {
 dependencies {
     implementation(libs.kotlinx.datetime)
     implementation(libs.kotlinx.coroutines.core)
+
+    testImplementation(libs.junit)
 }

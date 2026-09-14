@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -130,12 +131,6 @@ internal fun NoteDetailContent(
     }
 }
 
-private inline fun <T> androidx.compose.foundation.lazy.LazyListScope.items(
-    list: List<T>,
-    noinline key: (T) -> Any,
-    crossinline itemContent: @Composable (T) -> Unit,
-) = items(count = list.size, key = { key(list[it]) }) { itemContent(list[it]) }
-
 @Composable
 private fun TagChip(label: String) {
     val colors = VaaniTheme.colors
@@ -242,6 +237,7 @@ private fun SpeakerTag(label: String, variant: ChipVariant) {
         ChipVariant.Slate -> colors.slate
         ChipVariant.Sunken -> colors.coffeeLo
         ChipVariant.Sage -> colors.success
+        ChipVariant.Danger -> colors.danger
     }
     Box(Modifier.size(28.dp).background(bg), contentAlignment = Alignment.Center) {
         Text(label, color = colors.onCoffee, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -287,5 +283,39 @@ private fun AudioPlayerBar(player: PlayerState, onTogglePlay: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@androidx.compose.ui.tooling.preview.Preview(name = "Note · Light", showBackground = true, widthDp = 360, heightDp = 800)
+@androidx.compose.ui.tooling.preview.Preview(name = "Note · Dark", showBackground = true, widthDp = 360, heightDp = 800, uiMode = 0x20)
+@Composable
+private fun NoteDetailContentPreview() {
+    VaaniTheme {
+        NoteDetailContent(
+            state = NoteDetailUiState(
+                isLoading = false,
+                title = "Standup with Ravi & Priya",
+                meta = "15:02  ·  14:20  ·  3 speakers",
+                tags = listOf("#atlas", "#standup"),
+                summary = "The team agreed to move project Atlas to the next sprint.",
+                keyPoints = listOf(
+                    KeyPointRow("kp1", "Atlas moved to next sprint", "04:12", 252_000),
+                    KeyPointRow("kp2", "Ravi owns migration doc", "07:48", 468_000),
+                ),
+                todos = listOf(
+                    TodoRow("td1", "Send migration doc", "Ravi · by Fri", done = false),
+                    TodoRow("td2", "Spike rate-limit fix", "Priya", done = true),
+                ),
+                transcriptMeta = "Hinglish · codemix",
+                transcript = listOf(
+                    TranscriptRow("s1", "S1", ChipVariant.Coffee, "Atlas ka migration next sprint mein.", "04:08", 248_000),
+                    TranscriptRow("s2", "S2", ChipVariant.Slate, "Main doc Friday tak share karta hoon.", "04:20", 260_000),
+                ),
+                player = PlayerState("00:00", "14:20", 0f, false),
+            ),
+            onBack = {},
+            onToggleTodo = {},
+            onTogglePlay = {},
+        )
     }
 }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vaani.core.designsystem.component.ChipVariant
-import com.vaani.core.designsystem.component.HairlineDivider
 import com.vaani.core.designsystem.component.StatusChip
 import com.vaani.core.designsystem.component.SyncedPill
 import com.vaani.core.designsystem.component.VaaniCard
@@ -162,8 +162,7 @@ private fun NoteCard(row: NoteRow, onClick: () -> Unit) {
                 Text(
                     text = row.title,
                     color = colors.ink,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 17.sp,
+                    style = MaterialTheme.typography.titleLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
@@ -195,5 +194,38 @@ private fun NoteCard(row: NoteRow, onClick: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+private fun previewState() = LibraryUiState(
+    isLoading = false,
+    notesCount = 3,
+    recordedLabel = "0.8 h recorded",
+    syncedLabel = "Synced 2m",
+    sync = SyncBannerState(
+        title = "Syncing from device...",
+        detail = "3 recordings · 47 MB · over Wi-Fi",
+        progress = 0.34f,
+        percentLabel = "34%",
+    ),
+    groups = listOf(
+        DayGroup(
+            "TODAY",
+            listOf(
+                NoteRow("n1", "Standup with Ravi & Priya", "Pushed Atlas to next sprint…",
+                    "14:20  ·  3 speakers  ·  #atlas", "14:20", "Ready", ChipVariant.Sage, 2),
+                NoteRow("n2", "Call with vendor", "Transcribing 8 min of audio…",
+                    "08:03", "08:03", "Transcribing 62%", ChipVariant.Coffee, 1),
+            ),
+        ),
+    ),
+)
+
+@androidx.compose.ui.tooling.preview.Preview(name = "Library · Light", showBackground = true, widthDp = 360, heightDp = 720)
+@androidx.compose.ui.tooling.preview.Preview(name = "Library · Dark", showBackground = true, widthDp = 360, heightDp = 720, uiMode = 0x20)
+@androidx.compose.runtime.Composable
+private fun LibraryContentPreview() {
+    VaaniTheme {
+        LibraryContent(state = previewState(), onNoteClick = {})
     }
 }

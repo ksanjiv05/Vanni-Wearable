@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -84,12 +85,6 @@ internal fun TasksContent(
         }
     }
 }
-
-private inline fun <T> androidx.compose.foundation.lazy.LazyListScope.items(
-    list: List<T>,
-    noinline key: (T) -> Any,
-    crossinline itemContent: @Composable (T) -> Unit,
-) = items(count = list.size, key = { key(list[it]) }) { itemContent(list[it]) }
 
 @Composable
 private fun SegmentedControl(selected: TaskFilter, onFilter: (TaskFilter) -> Unit) {

@@ -155,6 +155,7 @@ private fun CitationChip(c: Citation) {
         com.vaani.core.designsystem.component.ChipVariant.Slate -> colors.slate
         com.vaani.core.designsystem.component.ChipVariant.Sage -> colors.success
         com.vaani.core.designsystem.component.ChipVariant.Sunken -> colors.coffeeLo
+        com.vaani.core.designsystem.component.ChipVariant.Danger -> colors.danger
     }
     Row(
         Modifier

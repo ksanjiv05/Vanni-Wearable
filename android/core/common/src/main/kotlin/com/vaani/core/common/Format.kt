@@ -1,5 +1,14 @@
 package com.vaani.core.common
 
+import java.util.Locale
+
+/**
+ * Technical/mono display values are always ASCII, locale-independent: formatted
+ * with [Locale.ROOT] so digits and decimal separators never localise (an
+ * India-first app must not render Arabic-Indic digits or comma decimals in
+ * timestamps / byte counts).
+ */
+
 /** Formats a millisecond offset as mm:ss or h:mm:ss (mono display). */
 fun formatClock(ms: Long): String {
     val totalSeconds = ms / 1000
@@ -7,9 +16,9 @@ fun formatClock(ms: Long): String {
     val m = (totalSeconds % 3600) / 60
     val s = totalSeconds % 60
     return if (h > 0) {
-        "%d:%02d:%02d".format(h, m, s)
+        String.format(Locale.ROOT, "%d:%02d:%02d", h, m, s)
     } else {
-        "%02d:%02d".format(m, s)
+        String.format(Locale.ROOT, "%02d:%02d", m, s)
     }
 }
 
@@ -19,11 +28,15 @@ fun formatDuration(ms: Long): String {
     val h = totalSeconds / 3600
     val m = (totalSeconds % 3600) / 60
     val s = totalSeconds % 60
-    return "%02d:%02d:%02d".format(h, m, s)
+    return String.format(Locale.ROOT, "%02d:%02d:%02d", h, m, s)
 }
 
 /** Human byte size, e.g. 47 MB. */
 fun formatBytes(bytes: Long): String {
     val mb = bytes.toDouble() / (1024 * 1024)
-    return if (mb >= 1) "%.0f MB".format(mb) else "%.0f KB".format(bytes.toDouble() / 1024)
+    return if (mb >= 1) {
+        String.format(Locale.ROOT, "%.0f MB", mb)
+    } else {
+        String.format(Locale.ROOT, "%.0f KB", bytes.toDouble() / 1024)
+    }
 }

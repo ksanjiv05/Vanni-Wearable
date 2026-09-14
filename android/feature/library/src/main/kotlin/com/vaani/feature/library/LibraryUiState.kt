@@ -1,7 +1,5 @@
 package com.vaani.feature.library
 
-import com.vaani.domain.model.Note
-
 /** Immutable UI state for the Library screen. */
 data class LibraryUiState(
     val isLoading: Boolean = true,
@@ -37,5 +35,3 @@ data class SyncBannerState(
     val progress: Float,
     val percentLabel: String,
 )
-
-internal fun Note.snippetOrEmpty(): String = summaryShort
