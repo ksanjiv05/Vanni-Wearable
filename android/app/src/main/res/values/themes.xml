@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Cream background; charcoal status-bar content. Compose draws the rest. -->
+    <style name="Theme.Vaani" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/vaani_background</item>
+        <item name="android:statusBarColor">@color/vaani_background</item>
+        <item name="android:navigationBarColor">@color/vaani_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

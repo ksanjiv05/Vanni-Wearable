@@ -1,0 +1,185 @@
+package com.vaani.feature.library
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vaani.core.designsystem.component.ChipVariant
+import com.vaani.core.designsystem.component.HairlineDivider
+import com.vaani.core.designsystem.component.StatusChip
+import com.vaani.core.designsystem.component.SyncedPill
+import com.vaani.core.designsystem.component.VaaniCard
+import com.vaani.core.designsystem.component.VaaniTopBar
+import com.vaani.core.designsystem.icon.VaaniIcon
+import com.vaani.core.designsystem.icon.VaaniIconView
+import com.vaani.core.designsystem.theme.MonoStyle
+import com.vaani.core.designsystem.theme.VaaniSpacing
+import com.vaani.core.designsystem.theme.VaaniPalette
+import com.vaani.core.designsystem.theme.VaaniTheme
+import com.vaani.core.ui.SectionHeader
+
+@Composable
+fun LibraryScreen(
+    onNoteClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: LibraryViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    LibraryContent(state = state, onNoteClick = onNoteClick, modifier = modifier)
+}
+
+@Composable
+internal fun LibraryContent(
+    state: LibraryUiState,
+    onNoteClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors = VaaniTheme.colors
+    Column(modifier.fillMaxSize().background(colors.background)) {
+        VaaniTopBar(
+            title = "Library",
+            largeTitle = true,
+            trailingSlot = if (state.syncedLabel.isNotEmpty()) {
+                { SyncedPill(state.syncedLabel) }
+            } else null,
+        )
+        Text(
+            text = "${state.notesCount} notes  ·  ${state.recordedLabel}",
+            color = colors.muted,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(horizontal = VaaniSpacing.screenH),
+        )
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = VaaniSpacing.screenH,
+                end = VaaniSpacing.screenH,
+                top = VaaniSpacing.md,
+                bottom = VaaniSpacing.xxl,
+            ),
+            verticalArrangement = Arrangement.spacedBy(VaaniSpacing.md),
+        ) {
+            state.sync?.let { item { SyncBanner(it) } }
+
+            state.groups.forEach { group ->
+                item { DayGroupHeader(group.header) }
+                items(group.notes, key = { it.id }) { row ->
+                    NoteCard(row = row, onClick = { onNoteClick(row.id) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DayGroupHeader(header: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        SectionHeader(header)
+        Box(
+            Modifier
+                .padding(start = 8.dp)
+                .height(1.dp)
+                .fillMaxWidth()
+                .background(VaaniTheme.colors.hairline),
+        )
+    }
+}
+
+@Composable
+private fun SyncBanner(sync: SyncBannerState) {
+    val colors = VaaniTheme.colors
+    Column(Modifier.fillMaxWidth().background(VaaniPalette.Ink)) {
+        Row(
+            Modifier.fillMaxWidth().padding(VaaniSpacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(VaaniSpacing.md),
+        ) {
+            Box(
+                Modifier.size(36.dp).background(colors.coffee),
+                contentAlignment = Alignment.Center,
+            ) {
+                VaaniIconView(VaaniIcon.ArrowDown, tint = colors.onCoffee, size = 20.dp)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(sync.title, color = VaaniPalette.Cream, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                Text(sync.detail, color = VaaniPalette.Muted, fontSize = 12.sp)
+            }
+            Text(sync.percentLabel, color = colors.coffeeHi, style = MonoStyle, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+        }
+        // progress bar (sharp)
+        Box(Modifier.fillMaxWidth().height(3.dp).background(VaaniPalette.DarkRaised)) {
+            Box(
+                Modifier
+                    .fillMaxWidth(sync.progress)
+                    .height(3.dp)
+                    .background(colors.coffee),
+            )
+        }
+    }
+}
+
+@Composable
+private fun NoteCard(row: NoteRow, onClick: () -> Unit) {
+    val colors = VaaniTheme.colors
+    VaaniCard(onClick = onClick) {
+        Column(Modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    text = row.title,
+                    color = colors.ink,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 17.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(row.durationLabel, color = colors.muted, style = MonoStyle)
+            }
+            Text(
+                text = row.snippet,
+                color = colors.secondary,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            Text(
+                text = row.meta,
+                color = colors.muted,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Row(
+                Modifier.padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusChip(row.statusLabel, row.statusVariant)
+                if (row.todoCount > 0) {
+                    StatusChip("${row.todoCount} to-dos", ChipVariant.Sunken)
+                }
+            }
+        }
+    }
+}
