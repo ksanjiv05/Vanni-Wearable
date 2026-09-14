@@ -35,6 +35,7 @@ import com.vaani.core.designsystem.theme.MonoStyle
 import com.vaani.core.designsystem.theme.OverlineStyle
 import com.vaani.core.designsystem.theme.VaaniSpacing
 import com.vaani.core.designsystem.theme.VaaniTheme
+import com.vaani.domain.ai.AiBackend
 
 @Composable
 fun SettingsScreen(
@@ -46,6 +47,8 @@ fun SettingsScreen(
         state = state,
         onBatterySaver = viewModel::setBatterySaver,
         onLocalOnly = viewModel::setLocalOnly,
+        onAsrBackend = viewModel::setAsrBackend,
+        onEnrichBackend = viewModel::setEnrichBackend,
         modifier = modifier,
     )
 }
@@ -55,6 +58,8 @@ internal fun SettingsContent(
     state: SettingsUiState,
     onBatterySaver: (Boolean) -> Unit,
     onLocalOnly: (Boolean) -> Unit,
+    onAsrBackend: (AiBackend) -> Unit = {},
+    onEnrichBackend: (AiBackend) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val colors = VaaniTheme.colors
@@ -77,6 +82,21 @@ internal fun SettingsContent(
         Box(Modifier.height(VaaniSpacing.md))
         BudgetCard(state, onAdjustCap = { showMessage("Budget cap editor lands in a later milestone") })
 
+        SectionLabel("AI ENGINE")
+        EnginePicker(
+            title = "Speech-to-text",
+            subtitle = "On-device is free & private; API is higher accuracy",
+            selected = state.asrBackend,
+            onSelect = onAsrBackend,
+        )
+        HairlineDivider()
+        EnginePicker(
+            title = "Note enrichment",
+            subtitle = "Summaries & to-dos — on-device or Sarvam",
+            selected = state.enrichBackend,
+            onSelect = onEnrichBackend,
+        )
+
         SectionLabel("PROCESSING")
         NavRow("Transcription quality", state.transcriptionQuality, "Best") { showMessage("Quality options land in a later milestone") }
         HairlineDivider()
@@ -97,6 +117,65 @@ internal fun SettingsContent(
 @Composable
 private fun SectionLabel(text: String) {
     Text(text, style = OverlineStyle, color = VaaniTheme.colors.muted, modifier = Modifier.padding(top = VaaniSpacing.lg, bottom = VaaniSpacing.sm))
+}
+
+/**
+ * Per-stage AI backend selector (ADR-001). A sharp-cornered two-segment
+ * control: On-device (Local) vs API (Sarvam). Selected segment fills with
+ * coffee; unselected is a hairline-bordered surface. No rounded corners.
+ */
+@Composable
+private fun EnginePicker(
+    title: String,
+    subtitle: String,
+    selected: AiBackend,
+    onSelect: (AiBackend) -> Unit,
+) {
+    val colors = VaaniTheme.colors
+    Column(Modifier.fillMaxWidth().background(colors.surface).padding(VaaniSpacing.lg)) {
+        Text(title, color = colors.ink, style = MaterialTheme.typography.titleMedium)
+        Text(
+            subtitle,
+            color = colors.muted,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Normal,
+            modifier = Modifier.padding(top = 2.dp),
+        )
+        Row(Modifier.fillMaxWidth().padding(top = VaaniSpacing.md)) {
+            EngineSegment("On-device", selected == AiBackend.LOCAL, Modifier.weight(1f)) {
+                onSelect(AiBackend.LOCAL)
+            }
+            Box(Modifier.width(VaaniSpacing.sm))
+            EngineSegment("API (Sarvam)", selected == AiBackend.SARVAM, Modifier.weight(1f)) {
+                onSelect(AiBackend.SARVAM)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EngineSegment(
+    label: String,
+    active: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val colors = VaaniTheme.colors
+    Box(
+        modifier
+            .height(44.dp)
+            .background(if (active) colors.coffee else colors.surface)
+            .border(VaaniSpacing.hairline, if (active) colors.coffee else colors.hairline)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            label,
+            color = if (active) colors.onCoffee else colors.secondary,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+        )
+    }
 }
 
 @Composable
