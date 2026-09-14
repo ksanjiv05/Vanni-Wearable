@@ -1,0 +1,15 @@
+# Android / Gradle
+android/.gradle/
+android/build/
+android/**/build/
+android/local.properties
+android/.idea/
+android/.kotlin/
+*.iml
+.DS_Store
+# secrets
+**/keystore.properties
+*.keystore
+# python
+__pycache__/
+*.pyc
