@@ -29,6 +29,8 @@ dependencies {
     implementation(project(":data:notes"))
     implementation(project(":data:database"))
     implementation(project(":data:audio"))
+    implementation(project(":data:pipeline"))
+    implementation(project(":data:asr-local"))
     implementation(project(":data:ai"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:ui"))
