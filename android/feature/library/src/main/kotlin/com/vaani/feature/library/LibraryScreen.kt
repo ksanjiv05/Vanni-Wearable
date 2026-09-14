@@ -80,7 +80,7 @@ internal fun LibraryContent(
         Text(
             text = "${state.notesCount} notes  ·  ${state.recordedLabel}",
             color = colors.muted,
-            fontSize = 13.sp,
+            style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(horizontal = VaaniSpacing.screenH),
         )
 
@@ -136,10 +136,10 @@ private fun SyncBanner(sync: SyncBannerState) {
                 VaaniIconView(VaaniIcon.ArrowDown, tint = colors.onCoffee, size = 20.dp)
             }
             Column(Modifier.weight(1f)) {
-                Text(sync.title, color = VaaniPalette.Cream, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                Text(sync.detail, color = VaaniPalette.Muted, fontSize = 12.sp)
+                Text(sync.title, color = VaaniPalette.Cream, style = MaterialTheme.typography.titleSmall)
+                Text(sync.detail, color = VaaniPalette.Muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
             }
-            Text(sync.percentLabel, color = colors.coffeeHi, style = MonoStyle, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(sync.percentLabel, color = colors.coffeeHi, style = MonoStyle.copy(fontWeight = FontWeight.Bold, fontSize = 15.sp))
         }
         // progress bar (sharp)
         Box(Modifier.fillMaxWidth().height(3.dp).background(VaaniPalette.DarkRaised)) {
@@ -172,7 +172,7 @@ private fun NoteCard(row: NoteRow, onClick: () -> Unit) {
             Text(
                 text = row.snippet,
                 color = colors.secondary,
-                fontSize = 14.sp,
+                style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 4.dp),
@@ -180,7 +180,8 @@ private fun NoteCard(row: NoteRow, onClick: () -> Unit) {
             Text(
                 text = row.meta,
                 color = colors.muted,
-                fontSize = 12.sp,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Normal,
                 modifier = Modifier.padding(top = 6.dp),
             )
             Row(

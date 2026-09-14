@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -21,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.vaani.core.designsystem.component.HairlineDivider
 import com.vaani.core.designsystem.component.VaaniButton
 import com.vaani.core.designsystem.icon.VaaniIcon
@@ -60,8 +60,7 @@ fun DeviceScreen(
         Text(
             "Device",
             color = colors.ink,
-            fontWeight = FontWeight.Bold,
-            fontSize = 30.sp,
+            style = MaterialTheme.typography.displayMedium,
             modifier = Modifier.padding(horizontal = VaaniSpacing.screenH, vertical = VaaniSpacing.sm),
         )
 
@@ -101,7 +100,7 @@ private fun HeroCard() {
                 Box(Modifier.width(10.dp).height(28.dp).background(colors.coffee))
             }
             Column(Modifier.weight(1f).padding(start = VaaniSpacing.md)) {
-                Text("Vaani One", color = VaaniPalette.Cream, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Text("Vaani One", color = VaaniPalette.Cream, style = MaterialTheme.typography.headlineMedium)
                 Row(
                     Modifier.padding(top = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -112,11 +111,11 @@ private fun HeroCard() {
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Box(Modifier.size(8.dp).background(colors.success))
-                            Text("Connected", color = VaaniPalette.Cream, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Connected", color = VaaniPalette.Cream, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
-                Text("Last sync 2 min ago · BLE", color = VaaniPalette.Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp))
+                Text("Last sync 2 min ago · BLE", color = VaaniPalette.Muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 6.dp))
             }
         }
         Row(Modifier.fillMaxWidth().padding(top = VaaniSpacing.lg)) {
@@ -130,7 +129,7 @@ private fun HeroCard() {
 private fun StatColumn(label: String, value: String, progress: Float, barColor: Color, modifier: Modifier = Modifier) {
     Column(modifier.padding(end = VaaniSpacing.lg)) {
         Text(label, style = OverlineStyle, color = VaaniPalette.Muted)
-        Text(value, color = VaaniPalette.Cream, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(top = 2.dp, bottom = 6.dp))
+        Text(value, color = VaaniPalette.Cream, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp, bottom = 6.dp))
         Box(Modifier.fillMaxWidth().height(4.dp).background(VaaniPalette.DarkRaised)) {
             Box(Modifier.fillMaxWidth(progress).height(4.dp).background(barColor))
         }
@@ -149,8 +148,8 @@ private fun PendingCard() {
     ) {
         Box(Modifier.width(VaaniSpacing.accentBar).fillMaxHeight().background(colors.coffee))
         Column(Modifier.weight(1f).padding(VaaniSpacing.lg)) {
-            Text("Pending on device", color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text("3 recordings · 47 MB · ready to sync", color = colors.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            Text("Pending on device", color = colors.ink, style = MaterialTheme.typography.titleMedium)
+            Text("3 recordings · 47 MB · ready to sync", color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 2.dp))
         }
         VaaniButton(label = "Sync now", onClick = {}, modifier = Modifier.padding(end = VaaniSpacing.md))
     }
@@ -164,8 +163,8 @@ private fun DeviceRow(title: String, subtitle: String, action: String, mono: Boo
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(subtitle, color = colors.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            Text(title, color = colors.ink, style = MaterialTheme.typography.titleMedium)
+            Text(subtitle, color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 2.dp))
         }
         if (mono) {
             Text(action, color = colors.muted, style = MonoStyle)

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vaani.core.designsystem.component.HairlineDivider
@@ -62,8 +62,8 @@ internal fun TasksContent(
             Modifier.fillMaxWidth().padding(horizontal = VaaniSpacing.screenH, vertical = VaaniSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Tasks", color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 30.sp, modifier = Modifier.weight(1f))
-            Text("${state.openCount} open", color = colors.muted, fontSize = 13.sp)
+            Text("Tasks", color = colors.ink, style = MaterialTheme.typography.displayMedium, modifier = Modifier.weight(1f))
+            Text("${state.openCount} open", color = colors.muted, style = MaterialTheme.typography.bodySmall)
         }
 
         SegmentedControl(state.filter, onFilter)
@@ -154,13 +154,13 @@ private fun TaskRowView(row: TaskRow, onToggle: (String) -> Unit) {
                 row.text,
                 color = if (row.done) colors.muted else colors.ink,
                 fontWeight = if (row.done) FontWeight.Normal else FontWeight.Bold,
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.titleMedium,
             )
             Row(modifier = Modifier.padding(top = 2.dp)) {
-                Text("from ", color = colors.muted, fontSize = 12.sp)
-                Text(row.sourceNote, color = colors.secondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Text("from ", color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
+                Text(row.sourceNote, color = colors.secondary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
             }
-            Text(row.subtitle, color = colors.muted, fontSize = 12.sp)
+            Text(row.subtitle, color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
         }
         Column(
             Modifier.padding(end = VaaniSpacing.md),
@@ -184,6 +184,6 @@ private fun PriorityChip(label: String, priority: TaskPriority) {
         TaskPriority.DONE -> colors.slate to colors.onCoffee
     }
     Box(Modifier.background(bg).padding(horizontal = 8.dp, vertical = 3.dp)) {
-        Text(label, color = fg, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = fg, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
     }
 }

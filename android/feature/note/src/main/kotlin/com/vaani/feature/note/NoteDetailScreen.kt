@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vaani.core.designsystem.component.ChipVariant
@@ -76,7 +76,7 @@ internal fun NoteDetailContent(
 
         if (state.isError) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                Text("Note not found.", color = colors.muted, fontSize = 15.sp)
+                Text("Note not found.", color = colors.muted, style = MaterialTheme.typography.bodyLarge)
             }
             return@Column
         }
@@ -90,8 +90,8 @@ internal fun NoteDetailContent(
             ),
         ) {
             item {
-                Text(state.title, color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 26.sp)
-                Text(state.meta, color = colors.muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+                Text(state.title, color = colors.ink, style = MaterialTheme.typography.displaySmall)
+                Text(state.meta, color = colors.muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                 Row(
                     Modifier.padding(top = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -120,7 +120,7 @@ internal fun NoteDetailContent(
                     ) {
                         SectionHeader("Transcript")
                         Box(Modifier.weight(1f))
-                        Text(state.transcriptMeta, color = colors.muted, fontSize = 12.sp)
+                        Text(state.transcriptMeta, color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
                     }
                 }
                 items(state.transcript, key = { it.id }) { TranscriptRowView(it) }
@@ -140,7 +140,7 @@ private fun TagChip(label: String) {
             .border(VaaniSpacing.hairline, colors.hairline)
             .padding(horizontal = 10.dp, vertical = 5.dp),
     ) {
-        Text(label, color = colors.slate, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = colors.slate, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -157,7 +157,7 @@ private fun SummaryCard(summary: String) {
         Box(Modifier.width(VaaniSpacing.accentBar).fillMaxHeight().background(colors.coffee))
         Column(Modifier.padding(VaaniSpacing.lg)) {
             SectionHeader("Summary")
-            Text(summary, color = colors.secondary, fontSize = 15.sp, modifier = Modifier.padding(top = 4.dp))
+            Text(summary, color = colors.secondary, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 4.dp))
         }
     }
 }
@@ -174,7 +174,7 @@ private fun KeyPointRowView(row: KeyPointRow) {
             Text(
                 row.text,
                 color = colors.ink,
-                fontSize = 15.sp,
+                style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.weight(1f).padding(start = 12.dp),
             )
             Text(row.seekLabel, color = colors.muted, style = MonoStyle)
@@ -199,11 +199,11 @@ private fun TodoRowView(row: TodoRow, onToggle: (String) -> Unit) {
                 Text(
                     row.text,
                     color = if (row.done) colors.muted else colors.ink,
-                    fontSize = 15.sp,
+                    style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (row.done) FontWeight.Normal else FontWeight.SemiBold,
                 )
                 if (row.subtitle.isNotEmpty()) {
-                    Text(row.subtitle, color = colors.muted, fontSize = 12.sp)
+                    Text(row.subtitle, color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
                 }
             }
         }
@@ -222,7 +222,7 @@ private fun TranscriptRowView(row: TranscriptRow) {
         Text(
             row.text,
             color = colors.ink,
-            fontSize = 14.sp,
+            style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f).padding(start = 10.dp),
         )
         Text(row.timeLabel, color = colors.muted, style = MonoStyle, modifier = Modifier.padding(start = 8.dp))
@@ -240,7 +240,7 @@ private fun SpeakerTag(label: String, variant: ChipVariant) {
         ChipVariant.Danger -> colors.danger
     }
     Box(Modifier.size(28.dp).background(bg), contentAlignment = Alignment.Center) {
-        Text(label, color = colors.onCoffee, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        Text(label, color = colors.onCoffee, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
     }
 }
 

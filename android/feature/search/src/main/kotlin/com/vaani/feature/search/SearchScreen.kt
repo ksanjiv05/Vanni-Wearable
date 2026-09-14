@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -63,8 +64,7 @@ internal fun SearchContent(
         Text(
             "Search",
             color = colors.ink,
-            fontWeight = FontWeight.Bold,
-            fontSize = 30.sp,
+            style = MaterialTheme.typography.displayMedium,
             modifier = Modifier.padding(horizontal = VaaniSpacing.screenH, vertical = VaaniSpacing.md),
         )
         SearchField(state.query, onQueryChange, onClear)
@@ -134,7 +134,7 @@ private fun SearchField(query: String, onQueryChange: (String) -> Unit, onClear:
             modifier = Modifier.weight(1f).padding(start = 10.dp),
             decorationBox = { inner ->
                 if (query.isEmpty()) {
-                    Text("Search notes, people, to-dos…", color = colors.muted, fontSize = 16.sp)
+                    Text("Search notes, people, to-dos…", color = colors.muted, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Normal)
                 }
                 inner()
             },
@@ -156,7 +156,7 @@ private fun OfflineBadge() {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         VaaniIconView(VaaniIcon.Zap, tint = colors.success, size = 14.dp)
-        Text("Works offline", color = colors.secondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text("Works offline", color = colors.secondary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -172,7 +172,7 @@ private fun FilterChip(chip: FilterChipState, onToggle: (String) -> Unit) {
             .clickable { onToggle(chip.label) }
             .padding(horizontal = 12.dp, vertical = 7.dp),
     ) {
-        Text(chip.label, color = fg, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+        Text(chip.label, color = fg, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -195,14 +195,13 @@ private fun ResultRow(result: SearchResult) {
             Text(
                 result.title,
                 color = colors.ink,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 8.dp),
             )
             Text(
                 result.snippet,
                 color = colors.secondary,
-                fontSize = 14.sp,
+                style = MaterialTheme.typography.bodyMedium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp),

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vaani.core.designsystem.component.HairlineDivider
@@ -68,8 +68,7 @@ internal fun SettingsContent(
         Text(
             "Settings",
             color = colors.ink,
-            fontWeight = FontWeight.Bold,
-            fontSize = 30.sp,
+            style = MaterialTheme.typography.displayMedium,
             modifier = Modifier.padding(vertical = VaaniSpacing.md),
         )
 
@@ -111,11 +110,11 @@ private fun ApiKeyCard(masked: String) {
     ) {
         Box(Modifier.width(VaaniSpacing.accentBar).fillMaxHeight().background(colors.coffee))
         Column(Modifier.weight(1f).padding(VaaniSpacing.lg)) {
-            Text("Sarvam API key", color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("Sarvam API key", color = colors.ink, style = MaterialTheme.typography.titleMedium)
             Text(masked, color = colors.muted, style = MonoStyle, modifier = Modifier.padding(top = 4.dp))
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(10.dp).background(colors.success))
-                Text("Billed to your account", color = colors.secondary, fontSize = 12.sp)
+                Text("Billed to your account", color = colors.secondary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
             }
         }
         Text("Manage", color = colors.slate, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(end = VaaniSpacing.lg))
@@ -128,11 +127,11 @@ private fun BudgetCard(state: SettingsUiState) {
     Column(Modifier.fillMaxWidth().background(colors.surface).padding(VaaniSpacing.lg)) {
         Text("MONTHLY BUDGET", style = OverlineStyle, color = colors.muted)
         Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.Bottom) {
-            Text(state.budgetSpentLabel, color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 28.sp)
+            Text(state.budgetSpentLabel, color = colors.ink, style = MaterialTheme.typography.displaySmall)
             Text(
                 "  ${state.budgetCapLabel}",
                 color = colors.muted,
-                fontSize = 13.sp,
+                style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
         }
@@ -140,7 +139,7 @@ private fun BudgetCard(state: SettingsUiState) {
             Box(Modifier.fillMaxWidth(state.budgetProgress).height(6.dp).background(colors.coffee))
         }
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(state.budgetDetail, color = colors.muted, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            Text(state.budgetDetail, color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.weight(1f))
             VaaniOutlineButton(label = "Adjust cap", onClick = {})
         }
     }
@@ -154,8 +153,8 @@ private fun NavRow(title: String, subtitle: String, action: String = "", chevron
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(subtitle, color = colors.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            Text(title, color = colors.ink, style = MaterialTheme.typography.titleMedium)
+            Text(subtitle, color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 2.dp))
         }
         if (action.isNotEmpty()) {
             Text(action, color = colors.slate, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(end = 8.dp))
@@ -174,8 +173,8 @@ private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onChang
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(subtitle, color = colors.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            Text(title, color = colors.ink, style = MaterialTheme.typography.titleMedium)
+            Text(subtitle, color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 2.dp))
         }
         VaaniToggle(checked = checked, onCheckedChange = onChange)
     }
@@ -195,8 +194,8 @@ private fun DeleteRow() {
     ) {
         VaaniIconView(VaaniIcon.Trash, tint = colors.danger, size = 20.dp)
         Column(Modifier.weight(1f).padding(start = VaaniSpacing.md)) {
-            Text("Delete everything", color = colors.danger, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text("Wipes notes, audio, vectors & key", color = colors.muted, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+            Text("Delete everything", color = colors.danger, style = MaterialTheme.typography.titleMedium)
+            Text("Wipes notes, audio, vectors & key", color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }

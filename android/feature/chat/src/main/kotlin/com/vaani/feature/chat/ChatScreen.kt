@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -68,7 +69,7 @@ internal fun ChatContent(
             Box(Modifier.size(40.dp).clickable(onClick = onBack), contentAlignment = Alignment.CenterStart) {
                 VaaniIconView(VaaniIcon.ChevronLeft, tint = colors.ink)
             }
-            Text("Ask your notes", color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+            Text("Ask your notes", color = colors.ink, style = MaterialTheme.typography.headlineMedium)
         }
 
         LazyColumn(
@@ -109,7 +110,7 @@ private fun UserBubble(text: String) {
                 .background(colors.coffee)
                 .padding(horizontal = VaaniSpacing.md, vertical = VaaniSpacing.md),
         ) {
-            Text(text, color = colors.onCoffee, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(text, color = colors.onCoffee, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
         }
     }
 }
@@ -126,14 +127,14 @@ private fun AnswerCard(answer: ChatMessage.Answer) {
         Box(Modifier.width(VaaniSpacing.accentBar).fillMaxHeight().background(colors.coffee))
         Column(Modifier.padding(VaaniSpacing.lg)) {
             Text("FROM YOUR NOTES", style = OverlineStyle, color = colors.muted)
-            Text(answer.lead, color = colors.ink, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp))
+            Text(answer.lead, color = colors.ink, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 6.dp))
             answer.points.forEachIndexed { i, p ->
                 Row(Modifier.padding(top = 8.dp)) {
-                    Text("${i + 1}. ", color = colors.secondary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text("${i + 1}. ", color = colors.secondary, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                     Text(
                         buildTextWithCite(p.text, p.citation),
                         color = colors.secondary,
-                        fontSize = 15.sp,
+                        style = MaterialTheme.typography.bodyLarge,
                     )
                 }
             }
@@ -170,9 +171,9 @@ private fun CitationChip(c: Citation) {
         Box(
             Modifier.padding(start = 8.dp, top = 8.dp, bottom = 8.dp).background(barColor).padding(horizontal = 7.dp, vertical = 3.dp),
         ) {
-            Text(c.badge, color = colors.onCoffee, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(c.badge, color = colors.onCoffee, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         }
-        Text(c.note, color = colors.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).padding(start = 10.dp))
+        Text(c.note, color = colors.ink, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f).padding(start = 10.dp))
         Text(c.seekLabel, color = colors.secondary, style = MonoStyle, modifier = Modifier.padding(end = VaaniSpacing.md))
     }
 }
@@ -187,7 +188,7 @@ private fun FollowUpChip(label: String) {
             .clickable {}
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
-        Text(label, color = colors.secondary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = colors.secondary, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -215,7 +216,7 @@ private fun InputBar(input: String, onInputChange: (String) -> Unit, onSend: () 
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.coffee),
                 modifier = Modifier.weight(1f),
                 decorationBox = { inner ->
-                    if (input.isEmpty()) Text("Ask anything about your notes…", color = colors.muted, fontSize = 15.sp)
+                    if (input.isEmpty()) Text("Ask anything about your notes…", color = colors.muted, style = MaterialTheme.typography.bodyLarge)
                     inner()
                 },
             )

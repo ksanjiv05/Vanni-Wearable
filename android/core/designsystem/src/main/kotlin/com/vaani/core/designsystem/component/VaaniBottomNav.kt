@@ -11,13 +11,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.vaani.core.designsystem.icon.VaaniIcon
 import com.vaani.core.designsystem.icon.VaaniIconView
 import com.vaani.core.designsystem.theme.VaaniTheme
@@ -66,7 +66,12 @@ private fun NavItem(icon: VaaniIcon, label: String, active: Boolean, onClick: ()
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         VaaniIconView(icon, tint = tint, size = 24.dp)
-        Text(label, color = tint, fontSize = 11.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal)
+        Text(
+            label,
+            color = tint,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }
 
@@ -86,6 +91,6 @@ private fun RecItem(onRec: () -> Unit) {
         ) {
             VaaniIconView(VaaniIcon.Mic, tint = colors.onCoffee, size = 26.dp)
         }
-        Text("REC", color = colors.coffee, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Text("REC", color = colors.coffee, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
     }
 }

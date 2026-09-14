@@ -9,13 +9,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.vaani.core.designsystem.icon.VaaniIcon
 import com.vaani.core.designsystem.icon.VaaniIconView
 import com.vaani.core.designsystem.theme.VaaniSpacing
@@ -58,8 +57,11 @@ fun VaaniTopBar(
         Text(
             text = title,
             color = colors.ink,
-            fontWeight = FontWeight.Bold,
-            fontSize = if (largeTitle) 30.sp else 20.sp,
+            style = if (largeTitle) {
+                MaterialTheme.typography.displayMedium
+            } else {
+                MaterialTheme.typography.headlineMedium
+            },
             modifier = Modifier.weight(1f),
         )
         if (trailingSlot != null) trailingSlot()
@@ -88,6 +90,6 @@ fun SyncedPill(label: String, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Box(Modifier.size(10.dp).background(colors.success))
-        Text(label, color = colors.secondary, fontSize = 13.sp)
+        Text(label, color = colors.secondary, style = MaterialTheme.typography.bodySmall)
     }
 }

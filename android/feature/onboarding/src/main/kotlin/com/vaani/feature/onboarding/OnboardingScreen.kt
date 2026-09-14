@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -54,12 +55,11 @@ fun OnboardingScreen(
             Modifier.fillMaxWidth().padding(top = VaaniSpacing.lg, bottom = VaaniSpacing.lg),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("VAANI", color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 22.sp, letterSpacing = 2.sp)
+            Text("VAANI", color = colors.ink, style = MaterialTheme.typography.headlineLarge, letterSpacing = 2.sp)
             Text(
                 "beta",
                 color = colors.muted,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.padding(start = 10.dp),
             )
             Box(Modifier.weight(1f))
@@ -75,17 +75,16 @@ fun OnboardingScreen(
         Text(
             "Your voice,",
             color = colors.ink,
-            fontWeight = FontWeight.Bold,
-            fontSize = 38.sp,
+            style = MaterialTheme.typography.displayLarge,
             modifier = Modifier.padding(top = VaaniSpacing.xl),
         )
-        Text("quietly organised.", color = colors.coffee, fontWeight = FontWeight.Bold, fontSize = 38.sp)
+        Text("quietly organised.", color = colors.coffee, style = MaterialTheme.typography.displayLarge)
         Text(
             "Record with your Vaani device. It syncs to your phone, transcribes on " +
                 "Sarvam, and turns every conversation into searchable notes — all " +
                 "indexed privately, on-device.",
             color = colors.secondary,
-            fontSize = 15.sp,
+            style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(top = VaaniSpacing.md),
         )
 
@@ -116,7 +115,7 @@ fun OnboardingScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             VaaniIconView(VaaniIcon.Shield, tint = colors.muted, size = 16.dp)
-            Text("Audio is encrypted on device · search stays offline", color = colors.muted, fontSize = 12.sp)
+            Text("Audio is encrypted on device · search stays offline", color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
         }
         Spacer(Modifier.height(VaaniSpacing.xl))
     }
@@ -137,7 +136,7 @@ private fun HeroWaveform() {
             Box(
                 Modifier.padding(12.dp).background(colors.coffee).padding(horizontal = 10.dp, vertical = 4.dp),
             ) {
-                Text("REC", color = colors.onCoffee, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                Text("REC", color = colors.onCoffee, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
             }
             // Bars
             Row(
@@ -183,8 +182,8 @@ private fun StepRow(
             )
         }
         Column(Modifier.weight(1f).padding(start = VaaniSpacing.md)) {
-            Text(title, color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Text(subtitle, color = colors.muted, fontSize = 12.sp)
+            Text(title, color = colors.ink, style = MaterialTheme.typography.titleMedium)
+            Text(subtitle, color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
         }
         if (trailingCheckbox) {
             VaaniCheckbox(checked = false, onCheckedChange = {}, boxSize = 24.dp)
