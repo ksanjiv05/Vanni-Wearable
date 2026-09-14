@@ -1,16 +1,18 @@
 package com.vaani.domain.repository
 
 import com.vaani.domain.model.Note
+import com.vaani.domain.model.Transcript
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Read surface for notes. Milestone A ships only a fake implementation
- * ([com.vaani.domain.repository.FakeNotesRepository]); the real Room-backed
- * repository lands in :data:notes in a later milestone.
+ * Read surface for notes. Presentation layers depend ONLY on this interface;
+ * the concrete data source (fake now, Room-backed :data:notes later) is bound
+ * in :app and is never referenced directly by features.
  */
 interface NotesRepository {
     fun observeNotes(): Flow<List<Note>>
     fun observeNote(id: String): Flow<Note?>
+    fun observeTranscript(noteId: String): Flow<Transcript?>
     fun syncStatus(): Flow<SyncStatus>
 }
 

@@ -65,6 +65,9 @@ data class Note(
     val entities: List<Entity>,
     val durationMs: Long,
     val speakerCount: Int,
+    val pipelineState: PipelineState,
+    /** Progress 0f..1f while [pipelineState] is in flight (TRANSCRIBING/ENRICHING); null otherwise. */
+    val pipelineProgress: Float? = null,
 )
 
 data class KeyPoint(
@@ -85,6 +88,8 @@ data class Todo(
     val priority: Priority,
     val status: TodoStatus,
     val sourceSegmentId: String?,
+    /** Audio offset of the source moment (§5.5.4 source_start_ms); null if unknown. */
+    val sourceStartMs: Long?,
     val completedAt: Instant?,
 )
 

@@ -5,6 +5,7 @@ import com.vaani.core.designsystem.component.ChipVariant
 /** Immutable UI state for the Note detail screen. */
 data class NoteDetailUiState(
     val isLoading: Boolean = true,
+    val isError: Boolean = false,
     val title: String = "",
     val meta: String = "",
     val tags: List<String> = emptyList(),

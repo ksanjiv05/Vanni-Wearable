@@ -90,8 +90,7 @@ class TasksViewModel @Inject constructor(
             todo.dueHint != null -> "Assigned to you · due ${todo.dueHint}"
             else -> "Assigned to you"
         }
-        val seek = todo.sourceSegmentId
-            ?.let { segId -> segMs[segId] }
+        val seek = todo.sourceStartMs
             ?.let { "▶ ${formatClock(it)}" }
             ?: "▶ --:--"
         return TaskRow(
@@ -109,7 +108,4 @@ class TasksViewModel @Inject constructor(
             done = done,
         )
     }
-
-    // Sample segment→ms map so back-link timestamps render like the mockup.
-    private val segMs = mapOf("seg1" to 468_000L, "seg2" to 663_000L, "seg3" to 494_000L)
 }

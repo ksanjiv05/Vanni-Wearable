@@ -73,6 +73,13 @@ internal fun NoteDetailContent(
             onTrailingClick = {},
         )
 
+        if (state.isError) {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+                Text("Note not found.", color = colors.muted, fontSize = 15.sp)
+            }
+            return@Column
+        }
+
         LazyColumn(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             contentPadding = PaddingValues(
