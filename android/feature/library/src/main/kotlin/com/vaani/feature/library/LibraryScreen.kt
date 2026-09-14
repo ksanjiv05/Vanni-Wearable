@@ -41,17 +41,27 @@ import com.vaani.core.ui.SectionHeader
 @Composable
 fun LibraryScreen(
     onNoteClick: (String) -> Unit,
+    onDeviceClick: () -> Unit,
+    onChatClick: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    LibraryContent(state = state, onNoteClick = onNoteClick, modifier = modifier)
+    LibraryContent(
+        state = state,
+        onNoteClick = onNoteClick,
+        onDeviceClick = onDeviceClick,
+        onChatClick = onChatClick,
+        modifier = modifier,
+    )
 }
 
 @Composable
 internal fun LibraryContent(
     state: LibraryUiState,
     onNoteClick: (String) -> Unit,
+    onDeviceClick: () -> Unit = {},
+    onChatClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val colors = VaaniTheme.colors
@@ -59,6 +69,10 @@ internal fun LibraryContent(
         VaaniTopBar(
             title = "Library",
             largeTitle = true,
+            leadingIcon = VaaniIcon.Bluetooth,
+            onLeadingClick = onDeviceClick,
+            trailingIcon = VaaniIcon.Zap,
+            onTrailingClick = onChatClick,
             trailingSlot = if (state.syncedLabel.isNotEmpty()) {
                 { SyncedPill(state.syncedLabel) }
             } else null,

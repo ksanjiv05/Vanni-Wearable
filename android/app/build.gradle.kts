@@ -31,6 +31,12 @@ dependencies {
     implementation(project(":core:common"))
     implementation(project(":feature:library"))
     implementation(project(":feature:note"))
+    implementation(project(":feature:onboarding"))
+    implementation(project(":feature:device"))
+    implementation(project(":feature:chat"))
+    implementation(project(":feature:search"))
+    implementation(project(":feature:tasks"))
+    implementation(project(":feature:settings"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
