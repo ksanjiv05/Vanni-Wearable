@@ -14,6 +14,8 @@ navigationCompose = "2.8.4"
 kotlinxDatetime = "0.6.1"
 kotlinxCoroutines = "1.9.0"
 datastore = "1.1.1"
+room = "2.6.1"
+media3 = "1.4.1"
 
 junit = "4.13.2"
 kotlinxCoroutinesTest = "1.9.0"
@@ -49,6 +51,13 @@ kotlinx-datetime = { group = "org.jetbrains.kotlinx", name = "kotlinx-datetime",
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+
+androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+androidx-media3-common = { group = "androidx.media3", name = "media3-common", version.ref = "media3" }
 
 # Test
 junit = { group = "junit", name = "junit", version.ref = "junit" }

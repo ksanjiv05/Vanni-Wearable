@@ -27,6 +27,8 @@ android {
 dependencies {
     implementation(project(":domain"))
     implementation(project(":data:notes"))
+    implementation(project(":data:database"))
+    implementation(project(":data:audio"))
     implementation(project(":data:ai"))
     implementation(project(":core:designsystem"))
     implementation(project(":core:ui"))

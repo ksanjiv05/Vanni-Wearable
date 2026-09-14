@@ -4,19 +4,16 @@ plugins {
 }
 
 android {
-    namespace = "com.vaani.data.notes"
+    namespace = "com.vaani.data.audio"
 }
 
 dependencies {
     implementation(project(":domain"))
-    implementation(project(":data:database"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.datetime)
-
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.common)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

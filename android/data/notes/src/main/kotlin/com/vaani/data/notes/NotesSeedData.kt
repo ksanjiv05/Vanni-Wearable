@@ -13,44 +13,21 @@ import com.vaani.domain.model.Todo
 import com.vaani.domain.model.TodoStatus
 import com.vaani.domain.model.Transcript
 import com.vaani.domain.model.TranscriptSegment
-import com.vaani.domain.repository.NotesRepository
 import com.vaani.domain.repository.SyncStatus
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Instant
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
- * In-memory [NotesRepository] for pre-data-layer milestones. Lives in
- * :data:notes (NOT :domain) and is bound in :app, so features depend only on
- * the interface. The real Room + SQLCipher repository replaces this class with
- * no change to any ViewModel.
+ * First-run seed fixtures for the Room database — the SAME literal values the
+ * old FakeNotesRepository exposed, so the Library/Note/Tasks/Search screens
+ * render byte-for-byte identically once seeded. The sync layer isn't built yet,
+ * so [syncStatus] is served from an in-memory flow (see RoomNotesRepository).
  */
-@Singleton
-class FakeNotesRepository @Inject constructor() : NotesRepository {
-
-    private val notesFlow = MutableStateFlow(FakeNotesData.notes)
-    private val syncFlow = MutableStateFlow(FakeNotesData.syncStatus)
-
-    override fun observeNotes(): Flow<List<Note>> = notesFlow
-
-    override fun observeNote(id: String): Flow<Note?> =
-        notesFlow.map { list -> list.firstOrNull { it.id == id } }
-
-    override fun observeTranscript(noteId: String): Flow<Transcript?> =
-        notesFlow.map { FakeNotesData.transcripts[noteId] }
-
-    override fun syncStatus(): Flow<SyncStatus> = syncFlow
-}
-
-/** Static fixtures matching the mockups in docs/screens; internal to :data:notes. */
-internal object FakeNotesData {
+internal object NotesSeedData {
 
     private val base: Instant = Instant.parse("2026-09-14T09:32:00Z")
     private val yesterday: Instant = Instant.parse("2026-09-13T15:10:00Z")
 
+    // TODO(sync): replace with a real device→phone sync source when it lands.
     val syncStatus = SyncStatus(
         isSyncing = true,
         pendingRecordings = 3,
@@ -161,8 +138,9 @@ internal object FakeNotesData {
 
     val notes: List<Note> = listOf(standup, vendor, designReview)
 
+    /** recordingId -> Transcript for the notes that have one (standup only). */
     val transcripts: Map<String, Transcript> = mapOf(
-        standup.id to Transcript(
+        standup.recordingId to Transcript(
             id = "t1",
             recordingId = "rec-1",
             provider = "sarvam",
@@ -175,12 +153,25 @@ internal object FakeNotesData {
         ),
     )
 
-    @Suppress("unused")
-    val recordings: Map<String, Recording> = mapOf(
-        standup.id to Recording(
+    /** recordingId -> Recording. Every seeded note needs a parent recording row
+     *  (note.recordingId → recording FK is implicit via the seed order). */
+    val recordings: List<Recording> = listOf(
+        Recording(
             id = "rec-1", deviceId = "dev-1", sessionUlid = "01J-STANDUP",
             startedAt = base, tzOffsetMinutes = 330, durationMs = 860_000,
             codec = "opus", sampleRate = 16_000, sha256 = "abc123", bytes = 9_400_000,
+            storageUri = null, syncState = SyncState.ACKED, pipelineState = PipelineState.READY,
+        ),
+        Recording(
+            id = "rec-2", deviceId = "dev-1", sessionUlid = "01J-VENDOR",
+            startedAt = base, tzOffsetMinutes = 330, durationMs = 483_000,
+            codec = "opus", sampleRate = 16_000, sha256 = "def456", bytes = 5_100_000,
+            storageUri = null, syncState = SyncState.PERSISTED, pipelineState = PipelineState.TRANSCRIBING,
+        ),
+        Recording(
+            id = "rec-3", deviceId = "dev-1", sessionUlid = "01J-DESIGN",
+            startedAt = yesterday, tzOffsetMinutes = 330, durationMs = 1_361_000,
+            codec = "opus", sampleRate = 16_000, sha256 = "ghi789", bytes = 14_800_000,
             storageUri = null, syncState = SyncState.ACKED, pipelineState = PipelineState.READY,
         ),
     )

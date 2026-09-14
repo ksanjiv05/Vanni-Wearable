@@ -4,12 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.vaani.data.notes"
+    namespace = "com.vaani.data.database"
 }
 
 dependencies {
     implementation(project(":domain"))
-    implementation(project(":data:database"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.core)
@@ -17,6 +16,9 @@ dependencies {
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    // The vaani.android.hilt convention plugin already applies KSP, so the
+    // `ksp(...)` configuration is available here without re-applying the plugin.
+    ksp(libs.androidx.room.compiler)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
