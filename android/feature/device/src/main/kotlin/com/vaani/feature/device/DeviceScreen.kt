@@ -43,6 +43,7 @@ fun DeviceScreen(
     modifier: Modifier = Modifier,
 ) {
     val colors = VaaniTheme.colors
+    val showMessage = com.vaani.core.designsystem.LocalShowMessage.current
     Column(
         modifier
             .fillMaxSize()
@@ -71,17 +72,17 @@ fun DeviceScreen(
             verticalArrangement = Arrangement.spacedBy(VaaniSpacing.md),
         ) {
             HeroCard()
-            PendingCard()
+            PendingCard(onSync = { showMessage("Sync starts when the device is in range") })
             Column {
-                DeviceRow("Firmware", "v1.0.3 · up to date", "Check")
+                DeviceRow("Firmware", "v1.0.3 · up to date", "Check") { showMessage("Firmware is up to date") }
                 HairlineDivider()
-                DeviceRow("Identify device", "Blink the LED to find it", "Blink")
+                DeviceRow("Identify device", "Blink the LED to find it", "Blink") { showMessage("Blinking the device LED…") }
                 HairlineDivider()
-                DeviceRow("Recording indicator", "LED always on while recording", "On")
+                DeviceRow("Recording indicator", "LED always on while recording", "On") { showMessage("Recording indicator is always on") }
                 HairlineDivider()
                 DeviceRow("Time sync", "Drift corrected on every connect", "±12 ms", mono = true)
             }
-            UnpairRow()
+            UnpairRow(onUnpair = { showMessage("Unpair — confirm dialog lands in a later milestone") })
         }
     }
 }
@@ -137,7 +138,7 @@ private fun StatColumn(label: String, value: String, progress: Float, barColor: 
 }
 
 @Composable
-private fun PendingCard() {
+private fun PendingCard(onSync: () -> Unit) {
     val colors = VaaniTheme.colors
     Row(
         Modifier
@@ -151,15 +152,19 @@ private fun PendingCard() {
             Text("Pending on device", color = colors.ink, style = MaterialTheme.typography.titleMedium)
             Text("3 recordings · 47 MB · ready to sync", color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 2.dp))
         }
-        VaaniButton(label = "Sync now", onClick = {}, modifier = Modifier.padding(end = VaaniSpacing.md))
+        VaaniButton(label = "Sync now", onClick = onSync, modifier = Modifier.padding(end = VaaniSpacing.md))
     }
 }
 
 @Composable
-private fun DeviceRow(title: String, subtitle: String, action: String, mono: Boolean = false) {
+private fun DeviceRow(title: String, subtitle: String, action: String, mono: Boolean = false, onClick: (() -> Unit)? = null) {
     val colors = VaaniTheme.colors
     Row(
-        Modifier.fillMaxWidth().background(colors.surface).padding(VaaniSpacing.lg),
+        Modifier
+            .fillMaxWidth()
+            .background(colors.surface)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(VaaniSpacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -175,14 +180,14 @@ private fun DeviceRow(title: String, subtitle: String, action: String, mono: Boo
 }
 
 @Composable
-private fun UnpairRow() {
+private fun UnpairRow(onUnpair: () -> Unit) {
     val colors = VaaniTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
             .background(colors.surface)
             .border(VaaniSpacing.hairline, colors.danger)
-            .clickable {}
+            .clickable(onClick = onUnpair)
             .padding(VaaniSpacing.lg),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,

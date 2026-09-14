@@ -26,6 +26,7 @@ data class TaskRow(
     val priorityLabel: String,
     val priority: TaskPriority,
     val done: Boolean,
+    val noteId: String = "",
 )
 
 enum class TaskPriority { HIGH, MEDIUM, LOW, DONE }

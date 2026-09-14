@@ -6,10 +6,17 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -18,6 +25,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.vaani.core.designsystem.LocalShowMessage
 import com.vaani.core.designsystem.component.VaaniBottomNav
 import com.vaani.core.designsystem.component.VaaniNavSlot
 import com.vaani.core.designsystem.theme.VaaniTheme
@@ -30,6 +38,7 @@ import com.vaani.feature.onboarding.OnboardingScreen
 import com.vaani.feature.search.SearchScreen
 import com.vaani.feature.settings.SettingsScreen
 import com.vaani.feature.tasks.TasksScreen
+import kotlinx.coroutines.launch
 
 /** Route constants for the single-activity nav graph. */
 object Routes {
@@ -55,63 +64,90 @@ fun VaaniAppRoot() {
 
     val showBottomNav = currentRoute in TAB_ROUTES
 
-    Scaffold(
-        containerColor = VaaniTheme.colors.background,
-        bottomBar = {
-            if (showBottomNav) {
-                VaaniBottomNav(
-                    selected = currentRoute.toSlot(),
-                    onSelect = { slot -> navController.switchTab(slot.toRoute()) },
-                    onRec = { /* REC capture flow lands with the recording milestone */ },
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val showMessage: (String) -> Unit = { msg ->
+        scope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(msg)
+        }
+    }
+
+    // Opens a note from anywhere (Library card, Search result, Task, citation).
+    val openNote: (String) -> Unit = { id -> navController.navigate(Routes.note(id)) }
+
+    CompositionLocalProvider(LocalShowMessage provides showMessage) {
+        Scaffold(
+            containerColor = VaaniTheme.colors.background,
+            snackbarHost = {
+                SnackbarHost(snackbarHostState) { data ->
+                    Snackbar(
+                        snackbarData = data,
+                        shape = RectangleShape,
+                        containerColor = VaaniTheme.colors.ink,
+                        contentColor = VaaniTheme.colors.background,
+                    )
+                }
+            },
+            bottomBar = {
+                if (showBottomNav) {
+                    VaaniBottomNav(
+                        selected = currentRoute.toSlot(),
+                        onSelect = { slot -> navController.switchTab(slot.toRoute()) },
+                        onRec = { showMessage("Recording starts from the paired Vaani device") },
+                    )
+                }
+            },
+        ) { innerPadding ->
+            val layoutDirection = LocalLayoutDirection.current
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(
+                        start = innerPadding.calculateStartPadding(layoutDirection),
+                        end = innerPadding.calculateEndPadding(layoutDirection),
+                        top = innerPadding.calculateTopPadding(),
+                        bottom = innerPadding.calculateBottomPadding(),
+                    ),
+            ) {
+                VaaniNavHost(
+                    startDestination = Routes.ONBOARDING,
+                    navController = navController,
+                    builder = {
+                        composable(Routes.ONBOARDING) {
+                            OnboardingScreen(
+                                onPair = { navController.switchTab(Routes.LIBRARY) },
+                                onSkip = { navController.switchTab(Routes.LIBRARY) },
+                            )
+                        }
+                        composable(Routes.LIBRARY) {
+                            LibraryScreen(
+                                onNoteClick = openNote,
+                                onDeviceClick = { navController.navigate(Routes.DEVICE) },
+                                onChatClick = { navController.navigate(Routes.CHAT) },
+                            )
+                        }
+                        composable(Routes.SEARCH) { SearchScreen(onOpenNote = openNote) }
+                        composable(Routes.TASKS) { TasksScreen(onOpenNote = openNote) }
+                        composable(Routes.SETTINGS) { SettingsScreen() }
+                        composable(Routes.DEVICE) {
+                            DeviceScreen(onBack = { navController.popBackStack() })
+                        }
+                        composable(Routes.CHAT) {
+                            ChatScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenNote = openNote,
+                            )
+                        }
+                        composable(
+                            Routes.NOTE,
+                            arguments = listOf(navArgument(NOTE_ID_ARG) { type = NavType.StringType }),
+                        ) {
+                            NoteDetailScreen(onBack = { navController.popBackStack() })
+                        }
+                    },
                 )
             }
-        },
-    ) { innerPadding ->
-        val layoutDirection = LocalLayoutDirection.current
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(
-                    start = innerPadding.calculateStartPadding(layoutDirection),
-                    end = innerPadding.calculateEndPadding(layoutDirection),
-                    top = innerPadding.calculateTopPadding(),
-                    bottom = innerPadding.calculateBottomPadding(),
-                ),
-        ) {
-            VaaniNavHost(
-                startDestination = Routes.ONBOARDING,
-                navController = navController,
-                builder = {
-                    composable(Routes.ONBOARDING) {
-                        OnboardingScreen(
-                            onPair = { navController.switchTab(Routes.LIBRARY) },
-                            onSkip = { navController.switchTab(Routes.LIBRARY) },
-                        )
-                    }
-                    composable(Routes.LIBRARY) {
-                        LibraryScreen(
-                            onNoteClick = { id -> navController.navigate(Routes.note(id)) },
-                            onDeviceClick = { navController.navigate(Routes.DEVICE) },
-                            onChatClick = { navController.navigate(Routes.CHAT) },
-                        )
-                    }
-                    composable(Routes.SEARCH) { SearchScreen() }
-                    composable(Routes.TASKS) { TasksScreen() }
-                    composable(Routes.SETTINGS) { SettingsScreen() }
-                    composable(Routes.DEVICE) {
-                        DeviceScreen(onBack = { navController.popBackStack() })
-                    }
-                    composable(Routes.CHAT) {
-                        ChatScreen(onBack = { navController.popBackStack() })
-                    }
-                    composable(
-                        Routes.NOTE,
-                        arguments = listOf(navArgument(NOTE_ID_ARG) { type = NavType.StringType }),
-                    ) {
-                        NoteDetailScreen(onBack = { navController.popBackStack() })
-                    }
-                },
-            )
         }
     }
 }

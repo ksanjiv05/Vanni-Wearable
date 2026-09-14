@@ -58,6 +58,7 @@ internal fun SettingsContent(
     modifier: Modifier = Modifier,
 ) {
     val colors = VaaniTheme.colors
+    val showMessage = com.vaani.core.designsystem.LocalShowMessage.current
     Column(
         modifier
             .fillMaxSize()
@@ -72,23 +73,23 @@ internal fun SettingsContent(
             modifier = Modifier.padding(vertical = VaaniSpacing.md),
         )
 
-        ApiKeyCard(state.apiKeyMasked)
+        ApiKeyCard(state.apiKeyMasked, onManage = { showMessage("API key management lands with the key vault") })
         Box(Modifier.height(VaaniSpacing.md))
-        BudgetCard(state)
+        BudgetCard(state, onAdjustCap = { showMessage("Budget cap editor lands in a later milestone") })
 
         SectionLabel("PROCESSING")
-        NavRow("Transcription quality", state.transcriptionQuality, "Best")
+        NavRow("Transcription quality", state.transcriptionQuality, "Best") { showMessage("Quality options land in a later milestone") }
         HairlineDivider()
-        NavRow("Default mode", state.defaultMode, "Codemix")
+        NavRow("Default mode", state.defaultMode, "Codemix") { showMessage("Mode options land in a later milestone") }
         HairlineDivider()
         ToggleRow("Battery & cost saver", "Skip silence with on-device VAD", state.batterySaver, onBatterySaver)
         HairlineDivider()
         ToggleRow("Local-only mode", "Never send audio; queue for later", state.localOnly, onLocalOnly)
 
         SectionLabel("DATA")
-        NavRow("Export everything", "Notes + audio as JSON + files", chevron = true)
+        NavRow("Export everything", "Notes + audio as JSON + files", chevron = true) { showMessage("Export lands in a later milestone") }
         Box(Modifier.height(VaaniSpacing.sm))
-        DeleteRow()
+        DeleteRow(onDelete = { showMessage("Delete everything — confirm dialog lands in a later milestone") })
         Box(Modifier.height(VaaniSpacing.xxl))
     }
 }
@@ -99,13 +100,14 @@ private fun SectionLabel(text: String) {
 }
 
 @Composable
-private fun ApiKeyCard(masked: String) {
+private fun ApiKeyCard(masked: String, onManage: () -> Unit) {
     val colors = VaaniTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
             .height(androidx.compose.foundation.layout.IntrinsicSize.Min)
-            .background(colors.surface),
+            .background(colors.surface)
+            .clickable(onClick = onManage),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(VaaniSpacing.accentBar).fillMaxHeight().background(colors.coffee))
@@ -122,7 +124,7 @@ private fun ApiKeyCard(masked: String) {
 }
 
 @Composable
-private fun BudgetCard(state: SettingsUiState) {
+private fun BudgetCard(state: SettingsUiState, onAdjustCap: () -> Unit) {
     val colors = VaaniTheme.colors
     Column(Modifier.fillMaxWidth().background(colors.surface).padding(VaaniSpacing.lg)) {
         Text("MONTHLY BUDGET", style = OverlineStyle, color = colors.muted)
@@ -140,16 +142,16 @@ private fun BudgetCard(state: SettingsUiState) {
         }
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(state.budgetDetail, color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.weight(1f))
-            VaaniOutlineButton(label = "Adjust cap", onClick = {})
+            VaaniOutlineButton(label = "Adjust cap", onClick = onAdjustCap)
         }
     }
 }
 
 @Composable
-private fun NavRow(title: String, subtitle: String, action: String = "", chevron: Boolean = false) {
+private fun NavRow(title: String, subtitle: String, action: String = "", chevron: Boolean = false, onClick: () -> Unit = {}) {
     val colors = VaaniTheme.colors
     Row(
-        Modifier.fillMaxWidth().background(colors.surface).clickable {}.padding(VaaniSpacing.lg),
+        Modifier.fillMaxWidth().background(colors.surface).clickable(onClick = onClick).padding(VaaniSpacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -181,14 +183,14 @@ private fun ToggleRow(title: String, subtitle: String, checked: Boolean, onChang
 }
 
 @Composable
-private fun DeleteRow() {
+private fun DeleteRow(onDelete: () -> Unit) {
     val colors = VaaniTheme.colors
     Row(
         Modifier
             .fillMaxWidth()
             .background(colors.surface)
             .border(VaaniSpacing.hairline, colors.danger)
-            .clickable {}
+            .clickable(onClick = onDelete)
             .padding(VaaniSpacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {

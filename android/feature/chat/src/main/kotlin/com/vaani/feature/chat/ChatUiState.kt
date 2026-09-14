@@ -29,4 +29,5 @@ data class Citation(
     val note: String,
     val seekLabel: String,
     val variant: ChipVariant,
+    val noteId: String = "",
 )

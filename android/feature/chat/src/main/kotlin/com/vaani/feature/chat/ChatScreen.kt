@@ -39,6 +39,7 @@ import com.vaani.core.designsystem.theme.VaaniTheme
 @Composable
 fun ChatScreen(
     onBack: () -> Unit,
+    onOpenNote: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
@@ -48,6 +49,8 @@ fun ChatScreen(
         onBack = onBack,
         onInputChange = viewModel::onInputChange,
         onSend = viewModel::onSend,
+        onOpenNote = onOpenNote,
+        onFollowUp = viewModel::onFollowUp,
         modifier = modifier,
     )
 }
@@ -58,6 +61,8 @@ internal fun ChatContent(
     onBack: () -> Unit,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
+    onOpenNote: (String) -> Unit = {},
+    onFollowUp: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val colors = VaaniTheme.colors
@@ -80,7 +85,7 @@ internal fun ChatContent(
             items(state.messages.size, key = { state.messages[it].id }) { i ->
                 when (val m = state.messages[i]) {
                     is ChatMessage.User -> UserBubble(m.text)
-                    is ChatMessage.Answer -> AnswerCard(m)
+                    is ChatMessage.Answer -> AnswerCard(m, onOpenNote)
                 }
             }
             if (state.followUps.isNotEmpty()) {
@@ -89,7 +94,7 @@ internal fun ChatContent(
                 }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        state.followUps.forEach { FollowUpChip(it) }
+                        state.followUps.forEach { FollowUpChip(it, onFollowUp) }
                     }
                 }
             }
@@ -116,7 +121,7 @@ private fun UserBubble(text: String) {
 }
 
 @Composable
-private fun AnswerCard(answer: ChatMessage.Answer) {
+private fun AnswerCard(answer: ChatMessage.Answer, onOpenNote: (String) -> Unit) {
     val colors = VaaniTheme.colors
     Row(
         Modifier
@@ -140,7 +145,7 @@ private fun AnswerCard(answer: ChatMessage.Answer) {
             }
             Text("SOURCES", style = OverlineStyle, color = colors.muted, modifier = Modifier.padding(top = 14.dp))
             answer.citations.forEach { c ->
-                CitationChip(c)
+                CitationChip(c, onOpenNote)
             }
         }
     }
@@ -149,7 +154,7 @@ private fun AnswerCard(answer: ChatMessage.Answer) {
 private fun buildTextWithCite(text: String, cite: String): String = "$text  [$cite]"
 
 @Composable
-private fun CitationChip(c: Citation) {
+private fun CitationChip(c: Citation, onOpenNote: (String) -> Unit) {
     val colors = VaaniTheme.colors
     val barColor = when (c.variant) {
         com.vaani.core.designsystem.component.ChipVariant.Coffee -> colors.coffee
@@ -164,7 +169,7 @@ private fun CitationChip(c: Citation) {
             .fillMaxWidth()
             .height(androidx.compose.foundation.layout.IntrinsicSize.Min)
             .background(colors.sunken)
-            .clickable {},
+            .clickable(enabled = c.noteId.isNotEmpty()) { onOpenNote(c.noteId) },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(VaaniSpacing.accentBar).fillMaxHeight().background(barColor))
@@ -179,13 +184,13 @@ private fun CitationChip(c: Citation) {
 }
 
 @Composable
-private fun FollowUpChip(label: String) {
+private fun FollowUpChip(label: String, onClick: (String) -> Unit) {
     val colors = VaaniTheme.colors
     Box(
         Modifier
             .background(colors.surface)
             .border(VaaniSpacing.hairline, colors.hairline)
-            .clickable {}
+            .clickable { onClick(label) }
             .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         Text(label, color = colors.secondary, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)

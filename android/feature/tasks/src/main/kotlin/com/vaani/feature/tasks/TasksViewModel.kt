@@ -106,6 +106,7 @@ class TasksViewModel @Inject constructor(
             },
             priority = prio,
             done = done,
+            noteId = note.id,
         )
     }
 }

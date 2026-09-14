@@ -37,6 +37,7 @@ import com.vaani.core.designsystem.theme.VaaniTheme
 
 @Composable
 fun TasksScreen(
+    onOpenNote: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: TasksViewModel = hiltViewModel(),
 ) {
@@ -45,6 +46,7 @@ fun TasksScreen(
         state = state,
         onFilter = viewModel::setFilter,
         onToggle = viewModel::toggle,
+        onOpenNote = onOpenNote,
         modifier = modifier,
     )
 }
@@ -54,6 +56,7 @@ internal fun TasksContent(
     state: TasksUiState,
     onFilter: (TaskFilter) -> Unit,
     onToggle: (String) -> Unit,
+    onOpenNote: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val colors = VaaniTheme.colors
@@ -80,7 +83,7 @@ internal fun TasksContent(
         ) {
             state.groups.forEach { group ->
                 item(key = "h-${group.header}") { GroupHeader(group.header, group.danger) }
-                items(group.rows, key = { it.id }) { row -> TaskRowView(row, onToggle) }
+                items(group.rows, key = { it.id }) { row -> TaskRowView(row, onToggle, onOpenNote) }
             }
         }
     }
@@ -129,7 +132,7 @@ private fun GroupHeader(header: String, danger: Boolean) {
 }
 
 @Composable
-private fun TaskRowView(row: TaskRow, onToggle: (String) -> Unit) {
+private fun TaskRowView(row: TaskRow, onToggle: (String) -> Unit, onOpenNote: (String) -> Unit) {
     val colors = VaaniTheme.colors
     val barColor = when (row.priority) {
         TaskPriority.HIGH -> colors.danger
@@ -149,7 +152,12 @@ private fun TaskRowView(row: TaskRow, onToggle: (String) -> Unit) {
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
             VaaniCheckbox(checked = row.done, onCheckedChange = { onToggle(row.id) }, boxSize = 24.dp)
         }
-        Column(Modifier.weight(1f).padding(vertical = VaaniSpacing.md)) {
+        Column(
+            Modifier
+                .weight(1f)
+                .clickable(enabled = row.noteId.isNotEmpty()) { onOpenNote(row.noteId) }
+                .padding(vertical = VaaniSpacing.md),
+        ) {
             Text(
                 row.text,
                 color = if (row.done) colors.muted else colors.ink,

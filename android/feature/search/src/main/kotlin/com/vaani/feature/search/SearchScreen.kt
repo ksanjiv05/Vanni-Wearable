@@ -38,6 +38,7 @@ import com.vaani.core.designsystem.theme.VaaniTheme
 
 @Composable
 fun SearchScreen(
+    onOpenNote: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
@@ -47,6 +48,7 @@ fun SearchScreen(
         onQueryChange = viewModel::onQueryChange,
         onClear = viewModel::clearQuery,
         onToggleFilter = viewModel::toggleFilter,
+        onOpenNote = onOpenNote,
         modifier = modifier,
     )
 }
@@ -57,6 +59,7 @@ internal fun SearchContent(
     onQueryChange: (String) -> Unit,
     onClear: () -> Unit,
     onToggleFilter: (String) -> Unit,
+    onOpenNote: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val colors = VaaniTheme.colors
@@ -102,7 +105,7 @@ internal fun SearchContent(
                 )
             }
             items(state.results.size, key = { state.results[it].id }) { i ->
-                ResultRow(state.results[i])
+                ResultRow(state.results[i], onOpenNote)
             }
         }
     }
@@ -177,7 +180,7 @@ private fun FilterChip(chip: FilterChipState, onToggle: (String) -> Unit) {
 }
 
 @Composable
-private fun ResultRow(result: SearchResult) {
+private fun ResultRow(result: SearchResult, onOpenNote: (String) -> Unit) {
     val colors = VaaniTheme.colors
     val variant = when (result.kind) {
         ResultKind.SUMMARY -> ChipVariant.Slate
@@ -186,7 +189,13 @@ private fun ResultRow(result: SearchResult) {
         ResultKind.TODO -> ChipVariant.Sage
     }
     Column {
-        Column(Modifier.fillMaxWidth().background(colors.surface).padding(VaaniSpacing.lg)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(colors.surface)
+                .clickable(enabled = result.noteId.isNotEmpty()) { onOpenNote(result.noteId) }
+                .padding(VaaniSpacing.lg),
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StatusChip(result.kindLabel, variant)
                 Box(Modifier.weight(1f))

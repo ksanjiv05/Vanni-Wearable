@@ -54,18 +54,22 @@ class SearchViewModel @Inject constructor() : ViewModel() {
                 SearchResult(
                     "r1", "SUMMARY", ResultKind.SUMMARY, "Design review",
                     "…budget signoff still pending, will revisit next sprint…", "0.91", "08:14",
+                    noteId = "note-design",
                 ),
                 SearchResult(
                     "r2", "TRANSCRIPT", ResultKind.TRANSCRIPT, "Standup with Ravi",
                     "…the marketing budget decision we deferred to Friday…", "0.88", "11:20",
+                    noteId = "note-standup",
                 ),
                 SearchResult(
                     "r3", "KEY POINT", ResultKind.KEY_POINT, "Q3 planning",
                     "Budget cap raised to ₹2L for the pilot phase", "0.83", "03:02",
+                    noteId = "note-design",
                 ),
                 SearchResult(
                     "r4", "TO-DO", ResultKind.TODO, "Vendor call",
                     "Confirm final budget with finance by Monday", "0.79", "--:--",
+                    noteId = "note-vendor",
                 ),
             ),
         )

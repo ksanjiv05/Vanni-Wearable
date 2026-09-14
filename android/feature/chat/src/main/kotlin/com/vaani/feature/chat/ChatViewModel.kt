@@ -12,7 +12,8 @@ import javax.inject.Inject
 /**
  * Chat — RAG answer with citation chips + follow-up chips (screen 04).
  * Milestone A shows one pre-canned Q&A exchange; real streaming retrieval
- * (§6) lands later. Input edits are live; send is a no-op stub.
+ * (§6) lands later. Input edits are live; send echoes the question and a
+ * placeholder answer so the flow is exercisable end-to-end.
  */
 @HiltViewModel
 class ChatViewModel @Inject constructor() : ViewModel() {
@@ -24,9 +25,33 @@ class ChatViewModel @Inject constructor() : ViewModel() {
         _uiState.update { it.copy(input = text) }
     }
 
-    /** Stub: real send triggers retrieval + streaming in a later milestone. */
+    /** Puts a follow-up suggestion into the composer so the user can send it. */
+    fun onFollowUp(text: String) {
+        _uiState.update { it.copy(input = text) }
+    }
+
+    /**
+     * Appends the typed question and a placeholder answer. Real retrieval +
+     * streaming (§6) replaces the canned answer in a later milestone.
+     */
     fun onSend() {
-        _uiState.update { it.copy(input = "") }
+        val text = _uiState.value.input.trim()
+        if (text.isEmpty()) return
+        _uiState.update { state ->
+            val n = state.messages.size
+            state.copy(
+                messages = state.messages + listOf(
+                    ChatMessage.User("u$n", text),
+                    ChatMessage.Answer(
+                        id = "a$n",
+                        lead = "Retrieval over your notes lands in a later milestone — here's a placeholder answer.",
+                        points = emptyList(),
+                        citations = emptyList(),
+                    ),
+                ),
+                input = "",
+            )
+        }
     }
 
     private companion object {
@@ -41,8 +66,8 @@ class ChatViewModel @Inject constructor() : ViewModel() {
                         AnswerPoint("Spike a fix for the API rate-limit risk", "C2"),
                     ),
                     citations = listOf(
-                        Citation("C1", "Standup · Ravi", "▶ 07:48", ChipVariant.Coffee),
-                        Citation("C2", "Standup · Priya", "▶ 11:03", ChipVariant.Slate),
+                        Citation("C1", "Standup · Ravi", "▶ 07:48", ChipVariant.Coffee, noteId = "note-standup"),
+                        Citation("C2", "Standup · Priya", "▶ 11:03", ChipVariant.Slate, noteId = "note-standup"),
                     ),
                 ),
             ),

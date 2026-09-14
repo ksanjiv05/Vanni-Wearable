@@ -22,6 +22,7 @@ data class SearchResult(
     val snippet: String,
     val score: String,
     val timeLabel: String,
+    val noteId: String = "",
 )
 
 enum class ResultKind { SUMMARY, TRANSCRIPT, KEY_POINT, TODO }

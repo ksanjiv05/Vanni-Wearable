@@ -65,13 +65,14 @@ internal fun NoteDetailContent(
     modifier: Modifier = Modifier,
 ) {
     val colors = VaaniTheme.colors
+    val showMessage = com.vaani.core.designsystem.LocalShowMessage.current
     Column(modifier.fillMaxSize().background(colors.background)) {
         VaaniTopBar(
             title = "",
             leadingIcon = VaaniIcon.ChevronLeft,
             onLeadingClick = onBack,
             trailingIcon = VaaniIcon.MoreH,
-            onTrailingClick = {},
+            onTrailingClick = { showMessage("Note actions (rename, export, delete) land in a later milestone") },
         )
 
         if (state.isError) {
