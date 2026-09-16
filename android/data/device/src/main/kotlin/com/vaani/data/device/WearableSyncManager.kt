@@ -32,13 +32,14 @@ class WearableSyncManager @Inject constructor(
     private val enqueuer: PipelineEnqueuer,
 ) {
     /** [link] is passed in (not injected) to avoid a DI cycle with DeviceLinkImpl. */
-    fun sync(link: DeviceLink): Flow<SyncProgress> = flow {
+    fun sync(link: DeviceLink, deleteAfterSync: Boolean = false): Flow<SyncProgress> = flow {
         when (val listed = link.listRecordings()) {
             is Outcome.Err -> { emit(SyncProgress.Failed(errText(listed))); return@flow }
             is Outcome.Ok -> {
                 val files = listed.value.filter { !it.isDir && isAudio(it.name) }
                 emit(SyncProgress.Started(files.size))
                 var imported = 0
+                var deleted = 0
                 files.forEachIndexed { i, f ->
                     val path = "/recordings/" + f.name.trimStart('/')
                     when (val pulled = link.pullRecording(path)) {
@@ -72,11 +73,20 @@ class WearableSyncManager @Inject constructor(
                                 enqueuer.enqueue(id)
                                 imported++
                                 emit(SyncProgress.Item(i + 1, files.size, f.name, blob.bytes, id))
+                                // Auto-delete: only AFTER the bytes are durably persisted to the phone
+                                // (blob store write + Recording row committed). Safe — the recording
+                                // survives on-device even if the pipeline later fails, so no data loss.
+                                if (deleteAfterSync) {
+                                    when (link.deleteFile(path)) {
+                                        is Outcome.Ok -> { deleted++; emit(SyncProgress.Deleted(f.name)) }
+                                        is Outcome.Err -> { /* keep the file on failure; not fatal */ }
+                                    }
+                                }
                             }
                         }
                     }
                 }
-                emit(SyncProgress.Done(imported, files.size))
+                emit(SyncProgress.Done(imported, files.size, deleted))
             }
         }
     }.flowOn(Dispatchers.IO)

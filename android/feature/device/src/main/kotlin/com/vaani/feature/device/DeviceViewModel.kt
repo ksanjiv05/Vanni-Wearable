@@ -30,6 +30,8 @@ data class DeviceUiState(
     val lastResult: String? = null,   // human-readable log line for the last read/write op
     val syncing: Boolean = false,
     val syncStatus: String? = null,   // live sync progress line
+    val deleteAfterSync: Boolean = false,   // auto-delete each recording from SD after safe import
+    val pendingDelete: String? = null,      // file path awaiting delete confirmation
     val message: String? = null,
 )
 
@@ -146,19 +148,51 @@ class DeviceViewModel @Inject constructor(
 
     fun syncRecordings() {
         _ui.value = _ui.value.copy(syncing = true, syncStatus = "Starting sync…", message = null)
+        val deleteAfter = _ui.value.deleteAfterSync
         viewModelScope.launch {
-            link.syncRecordings().collect { p ->
+            link.syncRecordings(deleteAfterSync = deleteAfter).collect { p ->
                 val line = when (p) {
                     is com.vaani.domain.device.SyncProgress.Started -> "Found ${p.total} recording(s) on device"
                     is com.vaani.domain.device.SyncProgress.Item -> "Pulled ${p.name} (${p.bytes} B) → queued [${p.index}/${p.total}]"
                     is com.vaani.domain.device.SyncProgress.Skipped -> "Skipped ${p.name}: ${p.reason}"
-                    is com.vaani.domain.device.SyncProgress.Done -> "Synced ${p.imported}/${p.total} — transcription queued"
+                    is com.vaani.domain.device.SyncProgress.Deleted -> "Deleted ${p.name} from device"
+                    is com.vaani.domain.device.SyncProgress.Done ->
+                        "Synced ${p.imported}/${p.total} — transcription queued" +
+                            if (p.deleted > 0) " · ${p.deleted} deleted from device" else ""
                     is com.vaani.domain.device.SyncProgress.Failed -> "Sync failed: ${p.message}"
                 }
                 val done = p is com.vaani.domain.device.SyncProgress.Done || p is com.vaani.domain.device.SyncProgress.Failed
                 _ui.value = _ui.value.copy(syncStatus = line, syncing = !done)
             }
             refreshFiles()
+        }
+    }
+
+    fun setDeleteAfterSync(enabled: Boolean) {
+        _ui.value = _ui.value.copy(deleteAfterSync = enabled)
+    }
+
+    /** Ask for confirmation before deleting a file from the wearable's SD card. */
+    fun requestDelete(path: String) {
+        _ui.value = _ui.value.copy(pendingDelete = path)
+    }
+
+    fun cancelDelete() {
+        _ui.value = _ui.value.copy(pendingDelete = null)
+    }
+
+    /** Confirmed manual delete of a file on the wearable's SD card, then re-list. */
+    fun confirmDelete() {
+        val path = _ui.value.pendingDelete ?: return
+        _ui.value = _ui.value.copy(pendingDelete = null, busy = true)
+        viewModelScope.launch {
+            when (val r = link.deleteFile(path)) {
+                is Outcome.Ok -> {
+                    _ui.value = _ui.value.copy(busy = false, lastResult = "DELETED $path")
+                    refreshFiles()
+                }
+                is Outcome.Err -> _ui.value = _ui.value.copy(busy = false, message = errText(r))
+            }
         }
     }
 

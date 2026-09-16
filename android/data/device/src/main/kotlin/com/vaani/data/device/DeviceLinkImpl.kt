@@ -215,7 +215,8 @@ class DeviceLinkImpl @Inject constructor(
         }
     }
 
-    override fun syncRecordings(): Flow<com.vaani.domain.device.SyncProgress> = syncManager.sync(this)
+    override fun syncRecordings(deleteAfterSync: Boolean): Flow<com.vaani.domain.device.SyncProgress> =
+        syncManager.sync(this, deleteAfterSync)
 
     private data class Creds(val ssid: String, val psk: String, val token: String)
 

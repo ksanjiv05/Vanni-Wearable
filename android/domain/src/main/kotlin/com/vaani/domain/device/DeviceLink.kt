@@ -92,8 +92,12 @@ interface DeviceLink {
      * Pull every recording off the wearable and feed it into the ingest pipeline
      * (transcribe → enrich → note). Emits progress per recording. Requires a
      * connected link. Idempotent: already-synced recordings dedupe by content hash.
+     *
+     * @param deleteAfterSync when true, each recording is deleted from the wearable's SD card
+     *   AFTER its bytes are safely persisted to the phone (durable blob store). Freed space is
+     *   reclaimed on the device. Skipped/failed recordings are never deleted.
      */
-    fun syncRecordings(): Flow<SyncProgress>
+    fun syncRecordings(deleteAfterSync: Boolean = false): Flow<SyncProgress>
 }
 
 /** Progress events for a wearable → pipeline sync. */
@@ -101,6 +105,7 @@ sealed interface SyncProgress {
     data class Started(val total: Int) : SyncProgress
     data class Item(val index: Int, val total: Int, val name: String, val bytes: Long, val recordingId: String) : SyncProgress
     data class Skipped(val name: String, val reason: String) : SyncProgress
-    data class Done(val imported: Int, val total: Int) : SyncProgress
+    data class Deleted(val name: String) : SyncProgress
+    data class Done(val imported: Int, val total: Int, val deleted: Int = 0) : SyncProgress
     data class Failed(val message: String) : SyncProgress
 }

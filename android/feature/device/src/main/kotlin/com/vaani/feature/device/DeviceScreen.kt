@@ -21,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -34,6 +36,7 @@ import com.vaani.core.designsystem.component.HairlineDivider
 import com.vaani.core.designsystem.component.StatusChip
 import com.vaani.core.designsystem.component.VaaniButton
 import com.vaani.core.designsystem.component.VaaniCard
+import com.vaani.core.designsystem.component.VaaniToggle
 import com.vaani.core.designsystem.icon.VaaniIcon
 import com.vaani.core.designsystem.icon.VaaniIconView
 import com.vaani.core.designsystem.theme.VaaniSpacing
@@ -149,6 +152,21 @@ fun DeviceScreen(
             // Sync recordings → pipeline (the core Vaani flow)
             if (ui.state == LinkState.CONNECTED) {
                 item {
+                    Row(
+                        Modifier.fillMaxWidth().clickable { viewModel.setDeleteAfterSync(!ui.deleteAfterSync) },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Delete from device after sync", style = MaterialTheme.typography.bodyMedium,
+                                color = colors.ink, fontWeight = FontWeight.Medium)
+                            Text("Frees SD space. Only deletes after the recording is safely on your phone.",
+                                style = MaterialTheme.typography.bodySmall, color = colors.muted)
+                        }
+                        Spacer(Modifier.width(VaaniSpacing.sm))
+                        VaaniToggle(checked = ui.deleteAfterSync, onCheckedChange = { viewModel.setDeleteAfterSync(it) })
+                    }
+                }
+                item {
                     VaaniButton(
                         label = if (ui.syncing) "Syncing recordings…" else "Sync recordings → notes",
                         onClick = { viewModel.syncRecordings() },
@@ -210,6 +228,16 @@ fun DeviceScreen(
                             style = MaterialTheme.typography.bodyMedium, color = colors.ink, modifier = Modifier.weight(1f))
                         Text(if (f.isDir) "dir" else "${f.size} B",
                             style = MaterialTheme.typography.bodySmall, color = colors.muted)
+                        if (!f.isDir) {
+                            Spacer(Modifier.width(VaaniSpacing.sm))
+                            Box(
+                                Modifier.size(32.dp)
+                                    .clickable(enabled = !ui.busy) { viewModel.requestDelete("/" + f.name.trimStart('/')) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                VaaniIconView(VaaniIcon.Trash, tint = colors.muted)
+                            }
+                        }
                     }
                 }
             }
@@ -228,6 +256,17 @@ fun DeviceScreen(
                 item { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.muted) }
             }
         }
+    }
+
+    // Confirm dialog for manual delete from the wearable's SD card.
+    ui.pendingDelete?.let { path ->
+        AlertDialog(
+            onDismissRequest = { viewModel.cancelDelete() },
+            title = { Text("Delete from device?") },
+            text = { Text("Permanently delete $path from the wearable's SD card. This can't be undone.") },
+            confirmButton = { TextButton(onClick = { viewModel.confirmDelete() }) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { viewModel.cancelDelete() }) { Text("Cancel") } },
+        )
     }
 }
 
