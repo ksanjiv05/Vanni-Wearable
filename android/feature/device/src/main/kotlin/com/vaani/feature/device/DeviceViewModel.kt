@@ -104,12 +104,13 @@ class DeviceViewModel @Inject constructor(
         }
     }
 
-    fun refreshFiles(path: String = "/") {
+    /** Only the app's own /vaani folder is shown — never the whole SD card. */
+    fun refreshFiles(path: String = VAANI_DIR) {
         viewModelScope.launch {
             _ui.value = _ui.value.copy(busy = true)
             when (val r = link.listFiles(path)) {
                 is Outcome.Ok -> _ui.value = _ui.value.copy(busy = false, files = r.value,
-                    message = "Listed ${r.value.size} entries")
+                    message = "Listed ${r.value.size} file(s)")
                 is Outcome.Err -> _ui.value = _ui.value.copy(busy = false, message = errText(r))
             }
         }
@@ -130,11 +131,11 @@ class DeviceViewModel @Inject constructor(
         }
     }
 
-    /** Write-test: write a timestamped note to the SD card, then re-list. */
+    /** Write-test: write a timestamped note into the app's /vaani folder, then re-list. */
     fun writeTestFile() {
         viewModelScope.launch {
             _ui.value = _ui.value.copy(busy = true)
-            val path = "/vaani_from_app.txt"
+            val path = "$VAANI_DIR/vaani_from_app.txt"
             val body = "Written by Vaani app at ${System.currentTimeMillis()} over ${_ui.value.transport}"
             when (val r = link.writeFile(path, body.toByteArray())) {
                 is Outcome.Ok -> {
@@ -212,4 +213,6 @@ class DeviceViewModel @Inject constructor(
         is com.vaani.domain.model.AppError.Unknown -> err.message
         else -> "Failed"
     }
+
+    companion object { const val VAANI_DIR = "/vaani" }
 }

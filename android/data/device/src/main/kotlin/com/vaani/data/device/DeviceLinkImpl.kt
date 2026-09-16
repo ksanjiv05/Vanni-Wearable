@@ -189,7 +189,7 @@ class DeviceLinkImpl @Inject constructor(
         }
     }
 
-    override suspend fun listRecordings(): Outcome<List<RemoteFile>> = listFiles("/recordings")
+    override suspend fun listRecordings(): Outcome<List<RemoteFile>> = listFiles("/vaani")
 
     override suspend fun pullRecording(path: String): Outcome<ByteArray> = withContext(Dispatchers.IO) {
         when (active) {

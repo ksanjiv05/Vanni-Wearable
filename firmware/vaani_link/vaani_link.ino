@@ -315,7 +315,25 @@ void setup(){
 
   sdOk = SD.begin(SD_CS, spiBus, 4000000);
   Serial.printf("SD: %s\n", sdOk?"OK":"FAIL");
-  if(sdOk && !SD.exists("/recordings")) SD.mkdir("/recordings");
+  // Single Vaani folder — ALL Vaani media/data lives under /vaani. The app browses only this dir,
+  // never the whole card. Migrate recordings from the legacy /recordings dir if present.
+  if(sdOk){
+    if(!SD.exists("/vaani")) SD.mkdir("/vaani");
+    if(SD.exists("/recordings")){
+      File d = SD.open("/recordings");
+      if(d && d.isDirectory()){
+        for(File f=d.openNextFile(); f; f=d.openNextFile()){
+          if(!f.isDirectory()){
+            String base = String(f.name()); int sl = base.lastIndexOf('/'); if(sl>=0) base = base.substring(sl+1);
+            String dst = "/vaani/" + base;
+            if(!SD.exists(dst)){ File out = SD.open(dst, FILE_WRITE); if(out){ uint8_t b[512]; int n; while((n=f.read(b,sizeof(b)))>0) out.write(b,n); out.close(); } }
+          }
+          f.close();
+        }
+        d.close();
+      }
+    }
+  }
 
   // WiFi SoftAP — start it first, THEN read the SoftAP MAC for a real per-device suffix.
   WiFi.mode(WIFI_AP);

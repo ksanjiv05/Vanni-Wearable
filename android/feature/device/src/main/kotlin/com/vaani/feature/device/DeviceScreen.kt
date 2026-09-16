@@ -205,22 +205,23 @@ fun DeviceScreen(
                 }
             }
 
-            // Files on the wearable (when connected)
+            // Files in the app's /vaani folder (when connected) — never the whole SD card
             if (ui.state == LinkState.CONNECTED) {
                 item {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        SectionLabel("SD CARD FILES", Modifier.weight(1f))
+                        SectionLabel("VAANI FILES", Modifier.weight(1f))
                         Text("Reload", style = MaterialTheme.typography.labelLarge, color = colors.coffee,
                             modifier = Modifier.clickable { viewModel.refreshFiles() })
                     }
                 }
                 if (ui.files.isEmpty()) {
-                    item { Text("No files (or not listed yet).", style = MaterialTheme.typography.bodyMedium, color = colors.muted) }
+                    item { Text("No Vaani files yet.", style = MaterialTheme.typography.bodyMedium, color = colors.muted) }
                 }
                 items(ui.files, key = { it.name }) { f ->
+                    val fullPath = "/vaani/" + f.name.trimStart('/')
                     Row(
                         Modifier.fillMaxWidth()
-                            .clickable(enabled = !f.isDir) { viewModel.readFile("/" + f.name.trimStart('/')) }
+                            .clickable(enabled = !f.isDir) { viewModel.readFile(fullPath) }
                             .padding(vertical = VaaniSpacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -232,7 +233,7 @@ fun DeviceScreen(
                             Spacer(Modifier.width(VaaniSpacing.sm))
                             Box(
                                 Modifier.size(32.dp)
-                                    .clickable(enabled = !ui.busy) { viewModel.requestDelete("/" + f.name.trimStart('/')) },
+                                    .clickable(enabled = !ui.busy) { viewModel.requestDelete(fullPath) },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 VaaniIconView(VaaniIcon.Trash, tint = colors.muted)

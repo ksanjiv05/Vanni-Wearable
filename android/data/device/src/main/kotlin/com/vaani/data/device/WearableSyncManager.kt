@@ -41,7 +41,7 @@ class WearableSyncManager @Inject constructor(
                 var imported = 0
                 var deleted = 0
                 files.forEachIndexed { i, f ->
-                    val path = "/recordings/" + f.name.trimStart('/')
+                    val path = VAANI_DIR + "/" + f.name.trimStart('/')
                     when (val pulled = link.pullRecording(path)) {
                         is Outcome.Err -> emit(SyncProgress.Skipped(f.name, errText(pulled)))
                         is Outcome.Ok -> {
@@ -100,4 +100,6 @@ class WearableSyncManager @Inject constructor(
         is com.vaani.domain.model.AppError.Unknown -> err.message
         else -> "failed"
     }
+
+    companion object { const val VAANI_DIR = "/vaani" }
 }
