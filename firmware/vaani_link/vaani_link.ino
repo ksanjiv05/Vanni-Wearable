@@ -253,6 +253,17 @@ class SrvCb : public BLEServerCallbacks {
   }
 };
 
+// SMP/pairing responder. Bluedroid will NOT answer the phone's pairing request (-> SMP_RSP_TIMEOUT,
+// bond fails) unless security callbacks are registered — even for Just Works. IO_CAP_NONE means no
+// passkey, so we just auto-confirm and accept the security request.
+class SecCb : public BLESecurityCallbacks {
+  uint32_t onPassKeyRequest() override { return 0; }
+  void onPassKeyNotify(uint32_t pass) override {}
+  bool onConfirmPIN(uint32_t pass) override { return true; }
+  bool onSecurityRequest() override { return true; }
+  bool onAuthorizationRequest(uint16_t, uint16_t, bool) override { return true; }
+};
+
 // ---- HTTP (WiFi transport) ----
 void sendJson(int code,const String&b){ server.sendHeader("Access-Control-Allow-Origin","*"); server.send(code,"application/json",b); }
 // Bearer-token gate: every /api/* call must present the per-device REST token (provisioned to the
@@ -329,6 +340,7 @@ void setup(){
   // Security: bonding + LE encryption (Just Works — the wearable has no keyboard/display for a
   // passkey). First connection bonds; keys persist in NVS so re-pairing is automatic. This makes
   // the encrypted BLE link the root of trust that hands out the WiFi PSK + REST token (CRED).
+  BLEDevice::setSecurityCallbacks(new SecCb());   // MUST be set or Bluedroid ignores the pairing req
   {
     BLESecurity* sec = new BLESecurity();
     sec->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);   // secure-connections + bonding

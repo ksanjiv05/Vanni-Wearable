@@ -187,19 +187,21 @@ class BleGattClient @Inject constructor(
             currentGatt = g
             val ok = withTimeoutOrNull(12_000) { onConnected!!.await() } ?: false
             if (ok) {
+                // For a BONDED device Android auto-initiates LE encryption right after connection.
+                // If we run discoverServices/MTU/notifications while that SMP exchange is in flight
+                // the stack reports "SMP state machine busy" and the encrypted characteristics fail
+                // (commands return null). Ensure the bond exists, then let encryption settle BEFORE
+                // touching GATT. createBond() is idempotent (fast no-op when already bonded).
+                ensureBonded(dev)
+                kotlinx.coroutines.delay(1500)   // let auto-encryption on the bonded link complete
                 onServices = CompletableDeferred()
                 gatt?.discoverServices()
                 val sok = withTimeoutOrNull(8_000) { onServices!!.await() } ?: false
                 if (sok) {
                     runCatching { gatt?.requestMtu(517) }
-                    kotlinx.coroutines.delay(200)
-                    // Ensure the link is bonded/encrypted BEFORE any command. The characteristics
-                    // require encryption; issuing a WRITE_NO_RESPONSE command before bonding
-                    // completes would be silently dropped. createBond() is idempotent (returns fast
-                    // if already bonded from a previous session — keys persist on both sides).
-                    ensureBonded(dev)
+                    kotlinx.coroutines.delay(250)
                     enableNotifications()
-                    kotlinx.coroutines.delay(300)
+                    kotlinx.coroutines.delay(400)
                     established = true
                     return true
                 }
