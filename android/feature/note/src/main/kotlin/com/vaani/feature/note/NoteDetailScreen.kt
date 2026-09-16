@@ -56,6 +56,7 @@ fun NoteDetailScreen(
     )
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun NoteDetailContent(
     state: NoteDetailUiState,
@@ -93,11 +94,14 @@ internal fun NoteDetailContent(
             item {
                 Text(state.title, color = colors.ink, style = MaterialTheme.typography.displaySmall)
                 Text(state.meta, color = colors.muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
-                Row(
-                    Modifier.padding(top = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    state.tags.forEach { TagChip(it) }
+                if (state.tags.isNotEmpty()) {
+                    androidx.compose.foundation.layout.FlowRow(
+                        Modifier.fillMaxWidth().padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        state.tags.forEach { TagChip(it) }
+                    }
                 }
             }
 

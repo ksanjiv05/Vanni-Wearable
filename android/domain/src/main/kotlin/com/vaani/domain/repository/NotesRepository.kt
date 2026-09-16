@@ -14,7 +14,24 @@ interface NotesRepository {
     fun observeNote(id: String): Flow<Note?>
     fun observeTranscript(noteId: String): Flow<Transcript?>
     fun syncStatus(): Flow<SyncStatus>
+
+    /**
+     * Recordings that have been imported/captured but not yet turned into a
+     * READY note (QUEUED/TRANSCRIBING/ENRICHING/FAILED). Drives the Library's
+     * live "processing" rows so an in-flight or failed import is visible rather
+     * than silently absent.
+     */
+    fun observeProcessing(): Flow<List<ProcessingRecording>>
 }
+
+/** A recording mid-pipeline (or failed), surfaced in the Library above the notes. */
+data class ProcessingRecording(
+    val recordingId: String,
+    val title: String,
+    val state: com.vaani.domain.model.PipelineState,
+    val bytes: Long,
+    val startedAt: kotlinx.datetime.Instant,
+)
 
 /** Snapshot of the device→phone sync, drives the Library banner. */
 data class SyncStatus(

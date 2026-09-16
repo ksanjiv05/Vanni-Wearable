@@ -1,4 +1,4 @@
-package com.vaani.data.audio
+package com.vaani.domain.audio
 
 import kotlinx.coroutines.flow.StateFlow
 
@@ -16,11 +16,12 @@ data class AudioPlaybackState(
 )
 
 /**
- * Thin wrapper over a Media3 player exposing playback control and a reactive
- * [state] stream of position + isPlaying.
+ * Playback port (domain seam). Presentation depends on THIS interface; the
+ * concrete Media3/ExoPlayer implementation lives in :data:audio and is bound in
+ * the app graph — features never touch the vendor player directly.
  *
- * The underlying ExoPlayer must be used on the main thread; implementations
- * marshal calls accordingly. Callers must invoke [release] to free resources.
+ * The underlying player must be used on the main thread; implementations marshal
+ * calls accordingly. Callers must invoke [release] to free resources.
  */
 interface AudioPlayer {
 

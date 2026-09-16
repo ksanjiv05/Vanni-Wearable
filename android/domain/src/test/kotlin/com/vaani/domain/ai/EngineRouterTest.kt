@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EngineRouterTest {
@@ -18,6 +18,13 @@ class EngineRouterTest {
             prefs = when (stage) {
                 AiStage.ASR -> prefs.copy(asr = backend)
                 AiStage.ENRICH -> prefs.copy(enrich = backend)
+            }
+        }
+        override suspend fun setPreferredModel(role: com.vaani.domain.ai.ModelRole, modelId: String?) {
+            prefs = when (role) {
+                com.vaani.domain.ai.ModelRole.ASR -> prefs.copy(asrModelId = modelId)
+                com.vaani.domain.ai.ModelRole.LLM -> prefs.copy(llmModelId = modelId)
+                else -> prefs
             }
         }
     }
@@ -55,28 +62,64 @@ class EngineRouterTest {
             FakeSettings(AiEnginePrefs(asr = AiBackend.LOCAL, enrich = AiBackend.SARVAM)),
             bothAsr, bothEnrich,
         )
-        assertEquals(AiBackend.LOCAL, router.asr().id)
-        assertEquals(AiBackend.SARVAM, router.enricher().id)
+        assertEquals(AiBackend.LOCAL, (router.asr() as Outcome.Ok).value.id)
+        assertEquals(AiBackend.SARVAM, (router.enricher() as Outcome.Ok).value.id)
     }
 
     @Test
-    fun fallsBackToSarvamWhenChosenBackendNotRegistered() = runBlocking {
-        // User wants LOCAL but only the SARVAM engine is registered (model not installed yet).
+    fun localChosenButNotRegistered_returnsModelUnavailable_neverSilentlyApi() = runBlocking {
+        // User explicitly wants LOCAL but only the SARVAM engine is registered
+        // (model not installed yet). The router must NOT quietly hand back the
+        // paid cloud engine — that would ship audio to the network without
+        // consent. It returns a typed ModelUnavailable the UI can act on.
         val router = EngineRouter(
             FakeSettings(AiEnginePrefs(asr = AiBackend.LOCAL)),
             asrEngines = mapOf(AiBackend.SARVAM to StubAsr(AiBackend.SARVAM)),
             enrichers = bothEnrich,
         )
-        assertEquals(AiBackend.SARVAM, router.asr().id)
+        val result = router.asr()
+        assertTrue(result is Outcome.Err)
+        val err = (result as Outcome.Err).error
+        assertTrue(err is AiError.ModelUnavailable)
+        assertEquals(AiBackend.LOCAL, (err as AiError.ModelUnavailable).backend)
     }
 
     @Test
-    fun throwsWhenNoEngineRegisteredAtAll() {
+    fun apiChosenButNoAdapterRegistered_returnsUnsupported() = runBlocking {
+        // SARVAM chosen but its adapter module isn't on the classpath yet.
+        val router = EngineRouter(
+            FakeSettings(AiEnginePrefs(asr = AiBackend.SARVAM)),
+            asrEngines = emptyMap(),
+            enrichers = bothEnrich,
+        )
+        val result = router.asr()
+        assertTrue(result is Outcome.Err)
+        assertTrue((result as Outcome.Err).error is AiError.Unsupported)
+    }
+
+    @Test
+    fun enrichAutoSelects_whenChosenBackendHasNoEnricher() = runBlocking {
+        // User's ENRICH choice is LOCAL but only a SARVAM enricher happens to be
+        // registered (or vice-versa): enrichment is task-specialised, so the
+        // router auto-selects an available enricher rather than failing the note.
+        // (Enrichment works on already-transcribed text — no new audio leaves.)
+        val router = EngineRouter(
+            FakeSettings(AiEnginePrefs(enrich = AiBackend.LOCAL)),
+            asrEngines = bothAsr,
+            enrichers = mapOf(AiBackend.SARVAM to StubEnricher(AiBackend.SARVAM)),
+        )
+        val result = router.enricher()
+        assertTrue(result is Outcome.Ok)
+        assertEquals(AiBackend.SARVAM, (result as Outcome.Ok).value.id)
+    }
+
+    @Test
+    fun returnsErrWhenNoEngineRegisteredAtAll() = runBlocking {
         val router = EngineRouter(
             FakeSettings(AiEnginePrefs()),
             asrEngines = emptyMap(),
             enrichers = bothEnrich,
         )
-        assertThrows(IllegalStateException::class.java) { runBlocking { router.asr() } }
+        assertTrue(router.asr() is Outcome.Err)
     }
 }

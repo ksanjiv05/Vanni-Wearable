@@ -12,9 +12,11 @@ import org.junit.Test
 class NotesSeedDataTest {
 
     @Test
-    fun seeds_exactlyThreeNotes_inOrder() {
-        assertEquals(listOf("note-standup", "note-vendor", "note-design"),
-            NotesSeedData.notes.map { it.id })
+    fun seedFixtures_stillDefined_forOptionalFirstRunSample() {
+        // Seeder is now a no-op (app starts empty), but the fixtures remain
+        // available for an optional future "load sample" action.
+        assertTrue(NotesSeedData.notes.isNotEmpty())
+        assertTrue(NotesSeedData.recordings.isNotEmpty())
     }
 
     @Test
@@ -32,14 +34,14 @@ class NotesSeedDataTest {
     }
 
     @Test
-    fun syncStatus_matchesFixture() {
+    fun syncStatus_isIdle_noFakeBanner() {
+        // Sync layer isn't built; status must be idle so no fabricated "Syncing…"
+        // banner shows on an empty install.
         val s = NotesSeedData.syncStatus
-        assertEquals(true, s.isSyncing)
-        assertEquals(3, s.pendingRecordings)
-        assertEquals(47L * 1024 * 1024, s.pendingBytes)
-        assertEquals(0.34f, s.progress)
-        assertEquals("Wi-Fi", s.transport)
-        assertEquals("Synced 2m", s.lastSyncedLabel)
+        assertEquals(false, s.isSyncing)
+        assertEquals(0, s.pendingRecordings)
+        assertEquals(0L, s.pendingBytes)
+        assertEquals(0f, s.progress)
     }
 
     @Test

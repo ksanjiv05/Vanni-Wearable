@@ -7,6 +7,8 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val followUps: List<String> = emptyList(),
     val input: String = "",
+    /** True while an answer is streaming, to disable send + show progress. */
+    val busy: Boolean = false,
 )
 
 sealed interface ChatMessage {

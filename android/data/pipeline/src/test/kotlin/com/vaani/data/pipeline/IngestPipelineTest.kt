@@ -64,6 +64,7 @@ class IngestPipelineTest {
         override suspend fun setRecordingPipelineState(recordingId: String, state: PipelineState) {
             log.recordingPipeline += recordingId to state
         }
+        override suspend fun setTodoStatus(todoId: String, status: com.vaani.domain.model.TodoStatus, completedAtEpochMs: Long?) {}
     }
 
     private class OkAsr : AsrEngine {
@@ -122,6 +123,7 @@ class IngestPipelineTest {
             override fun observe(): Flow<AiEnginePrefs> = flowOf(AiEnginePrefs(asr, enrich))
             override suspend fun current() = AiEnginePrefs(asr, enrich)
             override suspend fun setBackend(stage: AiStage, backend: AiBackend) {}
+            override suspend fun setPreferredModel(role: com.vaani.domain.ai.ModelRole, modelId: String?) {}
         }
 
     // --- tests ---------------------------------------------------------------
@@ -186,10 +188,45 @@ class IngestPipelineTest {
             asrEngines = mapOf(AiBackend.LOCAL to OkAsr(), AiBackend.SARVAM to sarvamAsr),
             enrichers = mapOf(AiBackend.LOCAL to OkEnricher()),
         )
-        assertEquals(AiBackend.SARVAM, router.asr().id)
-        assertEquals(AiBackend.LOCAL, router.enricher().id)
+        assertEquals(AiBackend.SARVAM, (router.asr() as Outcome.Ok).value.id)
+        assertEquals(AiBackend.LOCAL, (router.enricher() as Outcome.Ok).value.id)
 
         val result = IngestPipeline(router, FakeWriter(log)).process(audio)
         assertTrue(result is Outcome.Ok)
+    }
+
+    @Test
+    fun missingEnricher_savesTranscriptOnlyNote_reachesReady() = runBlocking {
+        // ASR succeeds but NO enricher is registered (no local LLM, no API key).
+        // The pipeline must still persist a real transcript-only note and reach
+        // READY — never discard a good transcript, never fabricate a summary.
+        val log = RecordingStates()
+        val router = EngineRouter(
+            settings(),
+            asrEngines = mapOf(AiBackend.LOCAL to OkAsr()),
+            enrichers = emptyMap(),
+        )
+        val result = IngestPipeline(router, FakeWriter(log)).process(audio)
+
+        assertTrue(result is Outcome.Ok)
+        assertEquals(PipelineState.READY, log.recordingPipeline.last().second)
+        assertTrue(log.savedNote != null)
+    }
+
+    @Test
+    fun missingAsrEngine_marksFailed_beforeAnyTranscribing() = runBlocking {
+        // LOCAL chosen but not registered → router returns ModelUnavailable.
+        // Pipeline fails to FAILED without ever calling an engine.
+        val log = RecordingStates()
+        val router = EngineRouter(
+            settings(asr = AiBackend.LOCAL),
+            asrEngines = emptyMap(),
+            enrichers = mapOf(AiBackend.LOCAL to OkEnricher()),
+        )
+        val result = IngestPipeline(router, FakeWriter(log)).process(audio)
+
+        assertTrue(result is Outcome.Err)
+        assertEquals(PipelineState.FAILED, log.recordingPipeline.last().second)
+        assertEquals(null, log.savedNote)
     }
 }

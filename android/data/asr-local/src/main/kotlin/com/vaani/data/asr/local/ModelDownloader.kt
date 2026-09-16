@@ -20,9 +20,12 @@ data class ModelSpec(
 
 /** Catalogue of the local ASR models this build knows how to fetch. */
 object AsrModels {
+    const val WHISPER_TINY_ID = "whisper-tiny-multilingual"
+    const val WHISPER_SMALL_ID = "whisper-small-multilingual"
+
     /** Whisper-small multilingual, the proven local-v1 model (ADR-001 §4). */
     val WHISPER_SMALL = ModelSpec(
-        id = "whisper-small-multilingual",
+        id = WHISPER_SMALL_ID,
         url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/" +
             "sherpa-onnx-whisper-small.tar.bz2",
         sha256 = "", // filled when the exact release asset is pinned
@@ -63,6 +66,12 @@ class ModelDownloader(private val baseDir: File) {
         openRange: (offset: Long) -> InputStream?,
         onProgress: (Float) -> Unit = {},
     ): DownloadResult {
+        // Fail closed: never fetch/promote a model whose integrity isn't pinned.
+        // An empty sha256 would make verify() a no-op and let a corrupt or
+        // MITM'd payload be promoted as if valid. A model must be pinned first.
+        if (spec.sha256.isBlank()) {
+            return DownloadResult.Failed("model ${spec.id} has no pinned sha256; refusing to download")
+        }
         baseDir.mkdirs()
         val target = resolved(spec)
         if (isPresent(spec) && verify(target, spec.sha256)) return DownloadResult.Done(target)

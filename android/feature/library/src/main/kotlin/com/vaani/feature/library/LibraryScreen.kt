@@ -52,6 +52,7 @@ fun LibraryScreen(
         onNoteClick = onNoteClick,
         onDeviceClick = onDeviceClick,
         onChatClick = onChatClick,
+        onRetry = viewModel::retry,
         modifier = modifier,
     )
 }
@@ -62,6 +63,7 @@ internal fun LibraryContent(
     onNoteClick: (String) -> Unit,
     onDeviceClick: () -> Unit = {},
     onChatClick: () -> Unit = {},
+    onRetry: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val colors = VaaniTheme.colors
@@ -96,11 +98,76 @@ internal fun LibraryContent(
         ) {
             state.sync?.let { item { SyncBanner(it) } }
 
+            if (state.processing.isNotEmpty()) {
+                item { DayGroupHeader("PROCESSING") }
+                items(state.processing, key = { it.recordingId }) { row ->
+                    ProcessingCard(row = row, onRetry = { onRetry(row.recordingId) })
+                }
+            }
+
             state.groups.forEach { group ->
                 item { DayGroupHeader(group.header) }
                 items(group.notes, key = { it.id }) { row ->
                     NoteCard(row = row, onClick = { onNoteClick(row.id) })
                 }
+            }
+
+            if (!state.isLoading && state.processing.isEmpty() && state.groups.isEmpty()) {
+                item { EmptyLibrary() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyLibrary() {
+    val colors = VaaniTheme.colors
+    Column(
+        Modifier.fillMaxWidth().padding(top = VaaniSpacing.xxl),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        VaaniIconView(VaaniIcon.ArrowDown, tint = colors.muted, size = 28.dp)
+        Text(
+            "No notes yet",
+            color = colors.ink,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = VaaniSpacing.md),
+        )
+        Text(
+            "Tap the record button to import audio and transcribe it on-device.",
+            color = colors.muted,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Normal,
+            modifier = Modifier.padding(top = 4.dp, start = VaaniSpacing.xl, end = VaaniSpacing.xl),
+        )
+    }
+}
+
+@Composable
+private fun ProcessingCard(row: ProcessingRow, onRetry: () -> Unit) {
+    val colors = VaaniTheme.colors
+    VaaniCard(onClick = if (row.isFailed) onRetry else ({})) {
+        Column(Modifier.fillMaxWidth()) {
+            Text(
+                text = row.title,
+                color = colors.ink,
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = row.meta,
+                color = colors.muted,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Normal,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+            Row(
+                Modifier.padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusChip(row.statusLabel, row.statusVariant)
             }
         }
     }

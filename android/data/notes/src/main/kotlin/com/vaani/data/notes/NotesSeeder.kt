@@ -28,16 +28,14 @@ class NotesSeeder @Inject constructor(
 ) {
     private val mutex = Mutex()
 
-    /** Suspending seed: inserts fixtures only when the notes table is empty. */
+    /**
+     * Suspending seed: previously inserted demo fixtures. Now a no-op — the app
+     * starts EMPTY so the user's imported recordings are the only content. Kept
+     * as a seam (and the fixtures remain in NotesSeedData) so we can re-enable a
+     * first-run sample from Settings later if desired.
+     */
     suspend fun seedIfEmpty() {
-        mutex.withLock {
-            if (recordingDao.count() > 0) return
-            // Recordings first so note.recordingId references resolve.
-            NotesSeedData.recordings.forEach { recordingDao.upsert(it.toEntity()) }
-            NotesSeedData.notes.forEach { note ->
-                notesWriter.upsertNote(note, NotesSeedData.transcripts[note.recordingId])
-            }
-        }
+        // Intentionally empty: no demo data. Import audio to create real notes.
     }
 
     /** Fire-and-forget helper for Application.onCreate. */

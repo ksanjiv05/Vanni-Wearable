@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Vaani talks to the ESP32 wearable's SoftAP over plain HTTP at 192.168.4.1
+  (an MCU can't do TLS cheaply, and it's a direct point-to-point link). Android 9+
+  blocks cleartext by default, so we permit it ONLY for the AP subnet. All other
+  traffic (HF/Sarvam model downloads, etc.) stays cleartext-forbidden.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">192.168.4.1</domain>
+    </domain-config>
+</network-security-config>

@@ -43,6 +43,9 @@ interface NoteDao {
     @Query("DELETE FROM todo WHERE noteId = :noteId")
     suspend fun clearTodos(noteId: String)
 
+    @Query("UPDATE todo SET status = :status, completedAtEpochMs = :completedAt WHERE id = :todoId")
+    suspend fun setTodoStatus(todoId: String, status: String, completedAt: Long?)
+
     @Query("DELETE FROM note_tag WHERE noteId = :noteId")
     suspend fun clearTagLinks(noteId: String)
 
@@ -76,6 +79,13 @@ interface RecordingDao {
 
     @Upsert
     suspend fun upsert(recording: RecordingEntity)
+
+    @Query("SELECT * FROM recording WHERE id = :id LIMIT 1")
+    suspend fun findById(id: String): RecordingEntity?
+
+    /** Recordings not yet turned into a READY note — drives the Library "processing" rows. */
+    @Query("SELECT * FROM recording WHERE pipelineState != 'READY' ORDER BY startedAtEpochMs DESC")
+    fun observeActive(): Flow<List<RecordingEntity>>
 
     @Query("SELECT COUNT(*) FROM recording")
     suspend fun count(): Int

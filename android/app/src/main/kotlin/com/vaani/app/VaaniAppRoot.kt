@@ -11,8 +11,14 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.vaani.app.audio.ImportViewModel
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -36,6 +42,7 @@ import com.vaani.feature.note.NOTE_ID_ARG
 import com.vaani.feature.note.NoteDetailScreen
 import com.vaani.feature.onboarding.OnboardingScreen
 import com.vaani.feature.search.SearchScreen
+import com.vaani.feature.settings.ModelCatalogScreen
 import com.vaani.feature.settings.SettingsScreen
 import com.vaani.feature.tasks.TasksScreen
 import kotlinx.coroutines.launch
@@ -47,6 +54,7 @@ object Routes {
     const val SEARCH = "search"
     const val TASKS = "tasks"
     const val SETTINGS = "settings"
+    const val MODELS = "models"
     const val DEVICE = "device"
     const val CHAT = "chat"
     const val NOTE = "note/{$NOTE_ID_ARG}"
@@ -73,6 +81,23 @@ fun VaaniAppRoot() {
         }
     }
 
+    // Audio import: system file picker → AudioImporter → pipeline. Surfaces a
+    // transient result via the shared snackbar.
+    val importViewModel: ImportViewModel = hiltViewModel()
+    val importMessage by importViewModel.message.collectAsState()
+    LaunchedEffect(importMessage) {
+        importMessage?.let { showMessage(it); importViewModel.consumeMessage() }
+    }
+    val audioPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent(),
+    ) { uri -> if (uri != null) importViewModel.import(uri) }
+    val importAudio: () -> Unit = { audioPicker.launch("audio/*") }
+
+    // Onboarding is shown only until the user pairs or taps "set up later";
+    // the choice is persisted (DataStore) so it doesn't reappear every launch.
+    val appViewModel: AppViewModel = hiltViewModel()
+    val onboarded by appViewModel.onboarded.collectAsState()
+
     // Opens a note from anywhere (Library card, Search result, Task, citation).
     val openNote: (String) -> Unit = { id -> navController.navigate(Routes.note(id)) }
 
@@ -94,7 +119,7 @@ fun VaaniAppRoot() {
                     VaaniBottomNav(
                         selected = currentRoute.toSlot(),
                         onSelect = { slot -> navController.switchTab(slot.toRoute()) },
-                        onRec = { showMessage("Recording starts from the paired Vaani device") },
+                        onRec = { importAudio() },
                     )
                 }
             },
@@ -111,13 +136,13 @@ fun VaaniAppRoot() {
                     ),
             ) {
                 VaaniNavHost(
-                    startDestination = Routes.ONBOARDING,
+                    startDestination = if (onboarded == true) Routes.LIBRARY else Routes.ONBOARDING,
                     navController = navController,
                     builder = {
                         composable(Routes.ONBOARDING) {
                             OnboardingScreen(
-                                onPair = { navController.switchTab(Routes.LIBRARY) },
-                                onSkip = { navController.switchTab(Routes.LIBRARY) },
+                                onPair = { appViewModel.completeOnboarding(); navController.switchTab(Routes.LIBRARY) },
+                                onSkip = { appViewModel.completeOnboarding(); navController.switchTab(Routes.LIBRARY) },
                             )
                         }
                         composable(Routes.LIBRARY) {
@@ -129,7 +154,12 @@ fun VaaniAppRoot() {
                         }
                         composable(Routes.SEARCH) { SearchScreen(onOpenNote = openNote) }
                         composable(Routes.TASKS) { TasksScreen(onOpenNote = openNote) }
-                        composable(Routes.SETTINGS) { SettingsScreen() }
+                        composable(Routes.SETTINGS) {
+                            SettingsScreen(onManageModels = { navController.navigate(Routes.MODELS) })
+                        }
+                        composable(Routes.MODELS) {
+                            ModelCatalogScreen(onBack = { navController.popBackStack() })
+                        }
                         composable(Routes.DEVICE) {
                             DeviceScreen(onBack = { navController.popBackStack() })
                         }

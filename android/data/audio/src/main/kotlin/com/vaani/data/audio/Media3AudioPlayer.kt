@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import com.vaani.domain.audio.AudioPlaybackState
+import com.vaani.domain.audio.AudioPlayer
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,8 +43,12 @@ internal class Media3AudioPlayer @Inject constructor(
 
     private var pollJob: Job? = null
 
+    /** Whether the lazy [player] has actually been created, so [release] can skip it otherwise. */
+    @Volatile private var playerCreated: Boolean = false
+
     // Constructed lazily on the main thread on first use.
     private val player: ExoPlayer by lazy {
+        playerCreated = true
         ExoPlayer.Builder(context).build().apply {
             addListener(object : Player.Listener {
                 override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -59,6 +65,7 @@ internal class Media3AudioPlayer @Inject constructor(
 
     override fun load(uri: String) = onMain {
         player.setMediaItem(MediaItem.fromUri(uri))
+        player.playWhenReady = false
         player.prepare()
         updateState()
     }
@@ -80,7 +87,13 @@ internal class Media3AudioPlayer @Inject constructor(
 
     override fun release() {
         stopPolling()
-        onMain { player.release() }
+        // Release the player on the main thread and only THEN cancel the scope.
+        // Launching release() on `scope` and immediately cancelling (the old code)
+        // could cancel the release coroutine before it ran, leaking the ExoPlayer.
+        // runBlocking on Main.immediate runs inline when already on the main thread.
+        kotlinx.coroutines.runBlocking(Dispatchers.Main.immediate) {
+            if (playerCreated) player.release()
+        }
         scope.cancel()
     }
 

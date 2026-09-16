@@ -1,5 +1,6 @@
 package com.vaani.data.audio
 
+import com.vaani.domain.audio.AudioPlayer
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

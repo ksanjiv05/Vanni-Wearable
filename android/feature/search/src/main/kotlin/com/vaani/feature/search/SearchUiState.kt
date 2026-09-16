@@ -2,7 +2,7 @@ package com.vaani.feature.search
 
 /** Immutable UI state for the Search screen. */
 data class SearchUiState(
-    val query: String = "budget decision",
+    val query: String = "",
     val offline: Boolean = true,
     val resultSummary: String = "",
     val filters: List<FilterChipState> = emptyList(),

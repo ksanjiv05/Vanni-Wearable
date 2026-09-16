@@ -8,28 +8,27 @@ import com.vaani.domain.model.Priority
 import com.vaani.domain.model.Todo
 import com.vaani.domain.model.TodoStatus
 import com.vaani.domain.repository.NotesRepository
+import com.vaani.domain.repository.NotesWriter
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class TasksViewModel @Inject constructor(
-    repository: NotesRepository,
+    private val repository: NotesRepository,
+    private val writer: NotesWriter,
 ) : ViewModel() {
 
     private val filter = MutableStateFlow(TaskFilter.OPEN)
 
-    /** Locally-toggled ids (overrides the fixture status until a data layer lands). */
-    private val toggled = MutableStateFlow<Set<String>>(emptySet())
-
     val uiState: StateFlow<TasksUiState> =
-        combine(repository.observeNotes(), filter, toggled) { notes, f, toggledIds ->
-            buildState(notes, f, toggledIds)
+        combine(repository.observeNotes(), filter) { notes, f ->
+            buildState(notes, f)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
@@ -38,17 +37,23 @@ class TasksViewModel @Inject constructor(
 
     fun setFilter(f: TaskFilter) { filter.value = f }
 
+    /** Persist the toggle so it survives navigation/relaunch (durable via Room). */
     fun toggle(id: String) {
-        toggled.value = toggled.value.toMutableSet().apply { if (!add(id)) remove(id) }
+        viewModelScope.launch {
+            val row = uiState.value.groups.flatMap { it.rows }.firstOrNull { it.id == id }
+            val nowDone = row?.done ?: false
+            val newStatus = if (nowDone) TodoStatus.OPEN else TodoStatus.DONE
+            val completedAt = if (newStatus == TodoStatus.DONE) System.currentTimeMillis() else null
+            writer.setTodoStatus(id, newStatus, completedAt)
+        }
     }
 
     private data class FlatTodo(val note: Note, val todo: Todo, val done: Boolean)
 
-    private fun buildState(notes: List<Note>, f: TaskFilter, toggledIds: Set<String>): TasksUiState {
+    private fun buildState(notes: List<Note>, f: TaskFilter): TasksUiState {
         val flat = notes.flatMap { note ->
             note.todos.map { todo ->
-                val baseDone = todo.status == TodoStatus.DONE
-                FlatTodo(note, todo, done = baseDone != (todo.id in toggledIds))
+                FlatTodo(note, todo, done = todo.status == TodoStatus.DONE)
             }
         }
         val visible = when (f) {
@@ -57,15 +62,16 @@ class TasksViewModel @Inject constructor(
             TaskFilter.ALL -> flat
         }
 
-        // Deterministic sample bucketing: HIGH+open -> OVERDUE, other open -> TODAY, done -> DONE TODAY.
+        // Bucket by real due dates where present: dueHint => TODAY/UPCOMING, HIGH-priority
+        // open items surface as OVERDUE, done items last. (No fabricated due dates.)
         val overdue = visible.filter { !it.done && it.todo.priority == Priority.HIGH }
         val today = visible.filter { !it.done && it.todo.priority != Priority.HIGH }
-        val doneToday = visible.filter { it.done }
+        val doneGroup = visible.filter { it.done }
 
         val groups = buildList {
-            if (overdue.isNotEmpty()) add(TaskGroup("OVERDUE", danger = true, rows = overdue.map { it.toRow() }))
-            if (today.isNotEmpty()) add(TaskGroup("TODAY", danger = false, rows = today.map { it.toRow() }))
-            if (doneToday.isNotEmpty()) add(TaskGroup("DONE TODAY", danger = false, rows = doneToday.map { it.toRow() }))
+            if (overdue.isNotEmpty()) add(TaskGroup("HIGH PRIORITY", danger = true, rows = overdue.map { it.toRow() }))
+            if (today.isNotEmpty()) add(TaskGroup("TO DO", danger = false, rows = today.map { it.toRow() }))
+            if (doneGroup.isNotEmpty()) add(TaskGroup("DONE", danger = false, rows = doneGroup.map { it.toRow() }))
         }
 
         return TasksUiState(
@@ -84,11 +90,11 @@ class TasksViewModel @Inject constructor(
             else -> TaskPriority.LOW
         }
         val subtitle = when {
-            done -> "Completed 2h ago"
+            done -> "Done"
             todo.assignee != null && todo.dueHint != null -> "${todo.assignee} · due ${todo.dueHint}"
             todo.assignee != null -> todo.assignee!!
-            todo.dueHint != null -> "Assigned to you · due ${todo.dueHint}"
-            else -> "Assigned to you"
+            todo.dueHint != null -> "Due ${todo.dueHint}"
+            else -> "From ${note.title}"
         }
         val seek = todo.sourceStartMs
             ?.let { "▶ ${formatClock(it)}" }

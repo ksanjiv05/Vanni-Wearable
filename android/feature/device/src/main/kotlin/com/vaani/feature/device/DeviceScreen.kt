@@ -1,198 +1,246 @@
 package com.vaani.feature.device
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vaani.core.designsystem.component.ChipVariant
 import com.vaani.core.designsystem.component.HairlineDivider
+import com.vaani.core.designsystem.component.StatusChip
 import com.vaani.core.designsystem.component.VaaniButton
+import com.vaani.core.designsystem.component.VaaniCard
 import com.vaani.core.designsystem.icon.VaaniIcon
 import com.vaani.core.designsystem.icon.VaaniIconView
-import com.vaani.core.designsystem.theme.MonoStyle
-import com.vaani.core.designsystem.theme.OverlineStyle
-import com.vaani.core.designsystem.theme.VaaniPalette
 import com.vaani.core.designsystem.theme.VaaniSpacing
 import com.vaani.core.designsystem.theme.VaaniTheme
+import com.vaani.domain.device.LinkState
+import com.vaani.domain.device.LinkTransport
 
 /**
- * Device — charcoal hero (battery/storage), backlog, firmware/OTA, identify,
- * unpair (screen 07). Milestone A renders the paired-device state from a
- * static snapshot; live BLE status lands in :data:device later.
+ * Device — live wearable link over BLE (primary) with Wi-Fi fallback.
+ * Scan → connect → see device/SD info → list files → read/write test.
  */
 @Composable
 fun DeviceScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: DeviceViewModel = hiltViewModel(),
 ) {
     val colors = VaaniTheme.colors
-    val showMessage = com.vaani.core.designsystem.LocalShowMessage.current
+    val ui by viewModel.ui.collectAsStateWithLifecycle()
+
+    val permLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { granted ->
+        if (granted.values.all { it }) viewModel.startScan()
+    }
+    fun requestScan() {
+        val perms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+        } else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        permLauncher.launch(perms)
+    }
+
     Column(
         modifier
             .fillMaxSize()
             .background(colors.background),
     ) {
+        // Top bar
         Row(
             Modifier.fillMaxWidth().padding(horizontal = VaaniSpacing.screenH, vertical = VaaniSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                Modifier.size(40.dp).clickable(onClick = onBack),
-                contentAlignment = Alignment.CenterStart,
-            ) { VaaniIconView(VaaniIcon.ChevronLeft, tint = colors.ink) }
+            Box(Modifier.size(40.dp).clickable(onClick = onBack), contentAlignment = Alignment.CenterStart) {
+                VaaniIconView(VaaniIcon.ChevronLeft, tint = colors.ink)
+            }
+            Text("Device", style = MaterialTheme.typography.titleLarge, color = colors.ink,
+                fontWeight = FontWeight.SemiBold)
         }
-        Text(
-            "Device",
-            color = colors.ink,
-            style = MaterialTheme.typography.displayMedium,
-            modifier = Modifier.padding(horizontal = VaaniSpacing.screenH, vertical = VaaniSpacing.sm),
-        )
+        HairlineDivider()
 
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = VaaniSpacing.screenH, vertical = VaaniSpacing.md),
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(VaaniSpacing.screenH),
             verticalArrangement = Arrangement.spacedBy(VaaniSpacing.md),
         ) {
-            HeroCard()
-            PendingCard(onSync = { showMessage("Sync starts when the device is in range") })
-            Column {
-                DeviceRow("Firmware", "v1.0.3 · up to date", "Check") { showMessage("Firmware is up to date") }
-                HairlineDivider()
-                DeviceRow("Identify device", "Blink the LED to find it", "Blink") { showMessage("Blinking the device LED…") }
-                HairlineDivider()
-                DeviceRow("Recording indicator", "LED always on while recording", "On") { showMessage("Recording indicator is always on") }
-                HairlineDivider()
-                DeviceRow("Time sync", "Drift corrected on every connect", "±12 ms", mono = true)
-            }
-            UnpairRow(onUnpair = { showMessage("Unpair — confirm dialog lands in a later milestone") })
-        }
-    }
-}
-
-@Composable
-private fun HeroCard() {
-    val colors = VaaniTheme.colors
-    Column(
-        Modifier.fillMaxWidth().background(VaaniPalette.Ink).padding(VaaniSpacing.lg),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(56.dp).border(VaaniSpacing.hairline, colors.coffeeLo),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(Modifier.width(10.dp).height(28.dp).background(colors.coffee))
-            }
-            Column(Modifier.weight(1f).padding(start = VaaniSpacing.md)) {
-                Text("Vaani One", color = VaaniPalette.Cream, style = MaterialTheme.typography.headlineMedium)
-                Row(
-                    Modifier.padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Box(
-                        Modifier.border(VaaniSpacing.hairline, Color(0xFF39352F)).padding(horizontal = 8.dp, vertical = 3.dp),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Box(Modifier.size(8.dp).background(colors.success))
-                            Text("Connected", color = VaaniPalette.Cream, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+            // Connection status
+            item {
+                val connected = ui.state == LinkState.CONNECTED
+                VaaniCard {
+                    Column(Modifier.padding(VaaniSpacing.md).fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                when (ui.state) {
+                                    LinkState.CONNECTED -> ui.deviceName ?: "Connected"
+                                    LinkState.CONNECTING -> "Connecting…"
+                                    LinkState.SCANNING -> "Scanning…"
+                                    LinkState.ERROR -> "Connection error"
+                                    else -> "No device paired"
+                                },
+                                style = MaterialTheme.typography.titleMedium, color = colors.ink,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (connected) {
+                                StatusChip(
+                                    label = if (ui.transport == LinkTransport.BLE) "BLE" else "Wi-Fi",
+                                    variant = ChipVariant.Coffee,
+                                )
+                            }
+                        }
+                        ui.info?.let { info ->
+                            Spacer(Modifier.height(VaaniSpacing.sm))
+                            InfoRow("Chip", info.chip)
+                            InfoRow("SD card", if (info.sdOk) "${info.sdType} · ${info.sdSizeMb} MB (${info.sdUsedMb} MB used)" else "not mounted")
+                            InfoRow("Free heap", "${info.freeHeap / 1024} KB")
+                            InfoRow("PSRAM free", "${info.psramFree / (1024 * 1024)} MB")
+                            if (info.ssid.isNotBlank()) InfoRow("Wi-Fi AP", "${info.ssid} @ ${info.ip}")
                         }
                     }
                 }
-                Text("Last sync 2 min ago · BLE", color = VaaniPalette.Muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 6.dp))
+            }
+
+            // Actions
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(VaaniSpacing.sm)) {
+                    if (ui.state != LinkState.CONNECTED) {
+                        VaaniButton(
+                            label = if (ui.scanning) "Scanning…" else "Scan",
+                            onClick = { requestScan() },
+                            enabled = !ui.scanning,
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        VaaniButton("Refresh", { viewModel.refreshInfo() }, Modifier.weight(1f))
+                        VaaniButton("Write test", { viewModel.writeTestFile() }, Modifier.weight(1f), enabled = !ui.busy)
+                        VaaniButton("Disconnect", { viewModel.disconnect() }, Modifier.weight(1f))
+                    }
+                }
+            }
+
+            // Sync recordings → pipeline (the core Vaani flow)
+            if (ui.state == LinkState.CONNECTED) {
+                item {
+                    VaaniButton(
+                        label = if (ui.syncing) "Syncing recordings…" else "Sync recordings → notes",
+                        onClick = { viewModel.syncRecordings() },
+                        enabled = !ui.syncing,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                ui.syncStatus?.let { s ->
+                    item {
+                        VaaniCard(accent = true) {
+                            Text(s, style = MaterialTheme.typography.bodySmall, color = colors.ink,
+                                modifier = Modifier.padding(VaaniSpacing.md))
+                        }
+                    }
+                }
+            }
+
+            // Discovered devices (while not yet connected)
+            if (ui.state != LinkState.CONNECTED && ui.found.isNotEmpty()) {
+                item { SectionLabel("FOUND DEVICES") }
+                items(ui.found, key = { it.id }) { dev ->
+                    VaaniCard(onClick = { viewModel.connect(dev) }) {
+                        Row(
+                            Modifier.padding(VaaniSpacing.md).fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(dev.name, style = MaterialTheme.typography.bodyLarge, color = colors.ink,
+                                    fontWeight = FontWeight.Medium)
+                                Text("${dev.id} · ${dev.rssi} dBm", style = MaterialTheme.typography.bodySmall,
+                                    color = colors.muted)
+                            }
+                            StatusChip("BLE", ChipVariant.Slate)
+                        }
+                    }
+                }
+            }
+
+            // Files on the wearable (when connected)
+            if (ui.state == LinkState.CONNECTED) {
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SectionLabel("SD CARD FILES", Modifier.weight(1f))
+                        Text("Reload", style = MaterialTheme.typography.labelLarge, color = colors.coffee,
+                            modifier = Modifier.clickable { viewModel.refreshFiles() })
+                    }
+                }
+                if (ui.files.isEmpty()) {
+                    item { Text("No files (or not listed yet).", style = MaterialTheme.typography.bodyMedium, color = colors.muted) }
+                }
+                items(ui.files, key = { it.name }) { f ->
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .clickable(enabled = !f.isDir) { viewModel.readFile("/" + f.name.trimStart('/')) }
+                            .padding(vertical = VaaniSpacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(if (f.isDir) "📁 ${f.name}" else "📄 ${f.name}",
+                            style = MaterialTheme.typography.bodyMedium, color = colors.ink, modifier = Modifier.weight(1f))
+                        Text(if (f.isDir) "dir" else "${f.size} B",
+                            style = MaterialTheme.typography.bodySmall, color = colors.muted)
+                    }
+                }
+            }
+
+            // Last read/write result
+            ui.lastResult?.let {
+                item {
+                    VaaniCard(accent = false) {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = colors.ink,
+                            modifier = Modifier.padding(VaaniSpacing.md))
+                    }
+                }
+            }
+
+            ui.message?.let {
+                item { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.muted) }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = VaaniSpacing.lg)) {
-            StatColumn("BATTERY", "82%", 0.82f, colors.success, Modifier.weight(1f))
-            StatColumn("STORAGE", "6.1 / 32 GB", 0.19f, colors.coffee, Modifier.weight(1f))
-        }
     }
 }
 
 @Composable
-private fun StatColumn(label: String, value: String, progress: Float, barColor: Color, modifier: Modifier = Modifier) {
-    Column(modifier.padding(end = VaaniSpacing.lg)) {
-        Text(label, style = OverlineStyle, color = VaaniPalette.Muted)
-        Text(value, color = VaaniPalette.Cream, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 2.dp, bottom = 6.dp))
-        Box(Modifier.fillMaxWidth().height(4.dp).background(VaaniPalette.DarkRaised)) {
-            Box(Modifier.fillMaxWidth(progress).height(4.dp).background(barColor))
-        }
-    }
-}
-
-@Composable
-private fun PendingCard(onSync: () -> Unit) {
+private fun InfoRow(label: String, value: String) {
     val colors = VaaniTheme.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(androidx.compose.foundation.layout.IntrinsicSize.Min)
-            .background(colors.surface),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.width(VaaniSpacing.accentBar).fillMaxHeight().background(colors.coffee))
-        Column(Modifier.weight(1f).padding(VaaniSpacing.lg)) {
-            Text("Pending on device", color = colors.ink, style = MaterialTheme.typography.titleMedium)
-            Text("3 recordings · 47 MB · ready to sync", color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 2.dp))
-        }
-        VaaniButton(label = "Sync now", onClick = onSync, modifier = Modifier.padding(end = VaaniSpacing.md))
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Text(label, style = MaterialTheme.typography.bodySmall, color = colors.muted, modifier = Modifier.width(96.dp))
+        Text(value, style = MaterialTheme.typography.bodySmall, color = colors.ink)
     }
 }
 
 @Composable
-private fun DeviceRow(title: String, subtitle: String, action: String, mono: Boolean = false, onClick: (() -> Unit)? = null) {
-    val colors = VaaniTheme.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(colors.surface)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(VaaniSpacing.lg),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(title, color = colors.ink, style = MaterialTheme.typography.titleMedium)
-            Text(subtitle, color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.padding(top = 2.dp))
-        }
-        if (mono) {
-            Text(action, color = colors.muted, style = MonoStyle)
-        } else {
-            Text(action, color = colors.slate, fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-@Composable
-private fun UnpairRow(onUnpair: () -> Unit) {
-    val colors = VaaniTheme.colors
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .background(colors.surface)
-            .border(VaaniSpacing.hairline, colors.danger)
-            .clickable(onClick = onUnpair)
-            .padding(VaaniSpacing.lg),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Unpair device", color = colors.danger, fontWeight = FontWeight.SemiBold)
-        VaaniIconView(VaaniIcon.Trash, tint = colors.danger, size = 18.dp, modifier = Modifier.padding(start = 10.dp))
-    }
+private fun SectionLabel(text: String, modifier: Modifier = Modifier) {
+    Text(text, style = MaterialTheme.typography.labelMedium, color = VaaniTheme.colors.muted, modifier = modifier)
 }

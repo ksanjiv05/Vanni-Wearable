@@ -8,6 +8,7 @@ import com.vaani.data.database.mapper.toEntityRow
 import com.vaani.data.database.entity.NoteTagCrossRef
 import com.vaani.domain.model.Note
 import com.vaani.domain.model.PipelineState
+import com.vaani.domain.model.TodoStatus
 import com.vaani.domain.model.Transcript
 import com.vaani.domain.repository.NotesWriter
 import javax.inject.Inject
@@ -61,5 +62,9 @@ class RoomNotesWriter @Inject constructor(
 
     override suspend fun setRecordingPipelineState(recordingId: String, state: PipelineState) {
         db.recordingDao().setPipelineState(recordingId, state.name)
+    }
+
+    override suspend fun setTodoStatus(todoId: String, status: TodoStatus, completedAtEpochMs: Long?) {
+        db.noteDao().setTodoStatus(todoId, status.name, completedAtEpochMs)
     }
 }

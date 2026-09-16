@@ -50,28 +50,62 @@ class IngestPipeline @Inject constructor(
      * the recording row is never left in a half-transcribed limbo.
      */
     suspend fun process(audio: AudioRef, opts: PipelineOptions = PipelineOptions()): Outcome<Note> {
+        // Resolve the ASR engine BEFORE marking TRANSCRIBING: a missing/unsupported
+        // backend must fail cleanly, never crash and never strand the recording
+        // mid-state. Router resolution is typed (Outcome), so it routes through fail().
+        val asrEngine = when (val r = router.asr()) {
+            is Outcome.Ok -> r.value
+            is Outcome.Err -> return fail(audio.recordingId, r)
+        }
         writer.setRecordingPipelineState(audio.recordingId, PipelineState.TRANSCRIBING)
 
-        val transcript = when (val r = router.asr().transcribe(audio, opts.asr) { p ->
+        val transcript = when (val r = asrEngine.transcribe(audio, opts.asr) { p ->
             // progress hook — the note may not exist yet, so this is best-effort.
         }) {
             is Outcome.Ok -> r.value
             is Outcome.Err -> return fail(audio.recordingId, r)
         }
 
-        writer.setRecordingPipelineState(audio.recordingId, PipelineState.ENRICHING)
-
-        val extraction = when (
-            val r = router.enricher().enrich(transcript, EnrichOptions(languageCode = transcript.languageCode))
-        ) {
-            is Outcome.Ok -> r.value
-            is Outcome.Err -> return fail(audio.recordingId, r)
+        // Enrichment is best-effort: if no enricher is available (no local LLM
+        // wired, no API key) OR enrichment fails, we STILL persist a real
+        // transcript-only note built from the actual ASR output — never fabricate
+        // a summary, never throw away a good transcript. Only ASR failure is fatal.
+        val extraction: NoteExtraction = when (val r = router.enricher()) {
+            is Outcome.Ok -> {
+                writer.setRecordingPipelineState(audio.recordingId, PipelineState.ENRICHING)
+                when (val e = r.value.enrich(transcript, EnrichOptions(languageCode = transcript.languageCode))) {
+                    is Outcome.Ok -> e.value
+                    is Outcome.Err -> transcriptOnlyExtraction(transcript)
+                }
+            }
+            is Outcome.Err -> transcriptOnlyExtraction(transcript)
         }
 
         val note = assembleNote(audio, transcript, extraction)
+
         writer.upsertNote(note, transcript.toDomain(noteRecordingId = audio.recordingId))
         writer.setRecordingPipelineState(audio.recordingId, PipelineState.READY)
         return Outcome.Ok(note)
+    }
+
+    /**
+     * Fallback note fields from the transcript alone, when no enricher is
+     * available/succeeds. Honest: a real title + summary taken verbatim from the
+     * recognized speech, no invented key points/todos.
+     */
+    private fun transcriptOnlyExtraction(t: DiarizedTranscript): NoteExtraction {
+        val text = t.fullText.trim()
+        val firstSentence = text.split(Regex("(?<=[.!?。！?])\\s+")).firstOrNull()?.take(80).orEmpty()
+        val title = firstSentence.ifBlank { "Voice note" }
+        val summary = text.take(140).let { if (text.length > 140) "$it…" else it }
+        return NoteExtraction(
+            title = title,
+            summaryShort = summary.ifBlank { "Transcript ready" },
+            summaryLong = text,
+            keyPoints = emptyList(),
+            todos = emptyList(),
+            tags = emptyList(),
+        )
     }
 
     private suspend fun fail(recordingId: String, err: Outcome.Err): Outcome<Note> {
@@ -88,6 +122,10 @@ class IngestPipeline @Inject constructor(
     ): Note {
         val now = clock.now()
         val noteId = "note-${audio.recordingId}"
+        // Real duration: prefer the source's known length, else the last segment's
+        // end time from the actual transcript (import sets durationMs=0 up front).
+        val durationMs = if (audio.durationMs > 0) audio.durationMs
+        else transcript.segments.maxOfOrNull { it.endMs } ?: 0L
         return Note(
             id = noteId,
             recordingId = audio.recordingId,
@@ -119,7 +157,7 @@ class IngestPipeline @Inject constructor(
                 )
             },
             entities = emptyList(),
-            durationMs = audio.durationMs,
+            durationMs = durationMs,
             speakerCount = transcript.speakerCount,
             pipelineState = PipelineState.READY,
             pipelineProgress = null,

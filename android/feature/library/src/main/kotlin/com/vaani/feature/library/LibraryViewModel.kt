@@ -8,12 +8,14 @@ import com.vaani.core.ui.chip
 import com.vaani.domain.model.Note
 import com.vaani.domain.model.PipelineState
 import com.vaani.domain.repository.NotesRepository
+import com.vaani.domain.repository.ProcessingRecording
 import com.vaani.domain.repository.SyncStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -25,18 +27,32 @@ import kotlin.math.roundToInt
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     repository: NotesRepository,
+    private val enqueuer: com.vaani.domain.pipeline.PipelineEnqueuer,
 ) : ViewModel() {
 
+    /** Re-run the ingest pipeline for a failed recording (tap-to-retry). */
+    fun retry(recordingId: String) {
+        viewModelScope.launch { enqueuer.enqueue(recordingId) }
+    }
+
     val uiState: StateFlow<LibraryUiState> =
-        combine(repository.observeNotes(), repository.syncStatus()) { notes, sync ->
-            buildState(notes, sync)
+        combine(
+            repository.observeNotes(),
+            repository.syncStatus(),
+            repository.observeProcessing(),
+        ) { notes, sync, processing ->
+            buildState(notes, sync, processing)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = LibraryUiState(isLoading = true),
         )
 
-    private fun buildState(notes: List<Note>, sync: SyncStatus): LibraryUiState {
+    private fun buildState(
+        notes: List<Note>,
+        sync: SyncStatus,
+        processing: List<ProcessingRecording>,
+    ): LibraryUiState {
         val totalMs = notes.sumOf { it.durationMs }
         // Day-bucket reference is derived from the emitted notes, not a fixture.
         val newestDate = notes.maxByOrNull { it.createdAt }
@@ -61,7 +77,24 @@ class LibraryViewModel @Inject constructor(
                     percentLabel = "${(sync.progress * 100).roundToInt()}%",
                 )
             } else null,
+            processing = processing.map { it.toProcessingRow() },
             groups = groups,
+        )
+    }
+
+    private fun ProcessingRecording.toProcessingRow(): ProcessingRow {
+        val (label, variant) = state.chip()
+        return ProcessingRow(
+            recordingId = recordingId,
+            title = title,
+            statusLabel = label,
+            statusVariant = variant,
+            meta = if (state == PipelineState.FAILED) {
+                "${formatBytes(bytes)}  ·  tap to retry"
+            } else {
+                "${formatBytes(bytes)}  ·  processing on-device"
+            },
+            isFailed = state == PipelineState.FAILED,
         )
     }
 

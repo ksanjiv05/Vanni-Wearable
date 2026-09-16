@@ -5,6 +5,14 @@ plugins {
 
 android {
     namespace = "com.vaani.data.asr.local"
+
+    defaultConfig {
+        // sherpa-onnx ships native .so only for these ABIs; arm64-v8a is the
+        // real target (ADR-001 gating requires it). Limiting keeps the APK sane.
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+    }
 }
 
 dependencies {
@@ -15,15 +23,16 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.datetime)
 
-    // sherpa-onnx (k2-fsa) provides the on-device ASR runtime. It is not on a
-    // stable Maven Central coordinate; integrate via one of (ADR-001 §7):
-    //   1. jitpack:  implementation("com.github.k2-fsa:sherpa-onnx-android:<ver>")
-    //   2. local AAR: build with android/build-android.sh arm64-v8a and
-    //      flatDir/publishToMavenLocal, then depend on it here.
-    // The native call is isolated in SherpaAsr.kt behind runCatching so this
-    // module compiles and the engine degrades to ModelUnavailable until the
-    // AAR + model are present. Uncomment when wiring the runtime:
-    // implementation("com.github.k2-fsa:sherpa-onnx-android:1.10.34")
+    // sherpa-onnx (k2-fsa) on-device ASR runtime — vendored prebuilt AAR
+    // (official v1.13.8 release; classes.jar + jni/<abi>/*.so for all ABIs).
+    // Resolved via the flatDir repo in settings.gradle.kts so the library
+    // module can repackage its classes + native libs. Wired in SherpaAsr.kt.
+    implementation(":sherpa-onnx-1.13.8@aar")
+
+    // MediaPipe LLM Inference — on-device GGUF/.task runtime for enrichment.
+    // Prebuilt AAR from Google Maven (bundles the native inference .so); wired
+    // in MediaPipeLlm.kt behind LocalLlmEnricher.
+    implementation(libs.mediapipe.tasks.genai)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

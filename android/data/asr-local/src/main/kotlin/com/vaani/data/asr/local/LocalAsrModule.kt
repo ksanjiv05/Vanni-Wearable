@@ -2,6 +2,7 @@ package com.vaani.data.asr.local
 
 import com.vaani.domain.ai.AiBackend
 import com.vaani.domain.ai.AsrEngine
+import com.vaani.domain.ai.Enricher
 import com.vaani.data.ai.AiBackendKey
 import dagger.Binds
 import dagger.Module
@@ -23,4 +24,15 @@ abstract class LocalAsrModule {
     @IntoMap
     @AiBackendKey(AiBackend.LOCAL)
     abstract fun bindLocalAsr(impl: LocalAsrEngine): AsrEngine
+
+    /**
+     * On-device enrichment for AiBackend.LOCAL. [LocalLlmEnricher] runs a real
+     * MediaPipe LLM when a `.task` model is installed, and transparently falls
+     * back to the extractive [LocalHeuristicEnricher] otherwise — so LOCAL notes
+     * always get summary/points/todos, upgraded automatically once an LLM lands.
+     */
+    @Binds
+    @IntoMap
+    @AiBackendKey(AiBackend.LOCAL)
+    abstract fun bindLocalEnricher(impl: LocalLlmEnricher): Enricher
 }

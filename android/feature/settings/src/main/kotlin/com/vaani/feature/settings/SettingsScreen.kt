@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -40,6 +41,7 @@ import com.vaani.domain.ai.AiBackend
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
+    onManageModels: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -49,6 +51,8 @@ fun SettingsScreen(
         onLocalOnly = viewModel::setLocalOnly,
         onAsrBackend = viewModel::setAsrBackend,
         onEnrichBackend = viewModel::setEnrichBackend,
+        onManageModels = onManageModels,
+        onSaveApiKey = viewModel::setApiKey,
         modifier = modifier,
     )
 }
@@ -60,10 +64,13 @@ internal fun SettingsContent(
     onLocalOnly: (Boolean) -> Unit,
     onAsrBackend: (AiBackend) -> Unit = {},
     onEnrichBackend: (AiBackend) -> Unit = {},
+    onManageModels: () -> Unit = {},
+    onSaveApiKey: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val colors = VaaniTheme.colors
     val showMessage = com.vaani.core.designsystem.LocalShowMessage.current
+    var showKeyDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     Column(
         modifier
             .fillMaxSize()
@@ -78,9 +85,8 @@ internal fun SettingsContent(
             modifier = Modifier.padding(vertical = VaaniSpacing.md),
         )
 
-        ApiKeyCard(state.apiKeyMasked, onManage = { showMessage("API key management lands with the key vault") })
-        Box(Modifier.height(VaaniSpacing.md))
-        BudgetCard(state, onAdjustCap = { showMessage("Budget cap editor lands in a later milestone") })
+        SectionLabel("ACTIVE ENGINES")
+        ActiveEnginesCard(state)
 
         SectionLabel("AI ENGINE")
         EnginePicker(
@@ -96,12 +102,22 @@ internal fun SettingsContent(
             selected = state.enrichBackend,
             onSelect = onEnrichBackend,
         )
+        HairlineDivider()
+        NavRow(
+            "On-device models",
+            "Download & manage local ASR / LLM models",
+            chevron = true,
+            onClick = onManageModels,
+        )
+
+        SectionLabel("SARVAM API")
+        ApiKeyCard(
+            present = state.apiKeyPresent,
+            masked = state.apiKeyMasked,
+            onManage = { showKeyDialog = true },
+        )
 
         SectionLabel("PROCESSING")
-        NavRow("Transcription quality", state.transcriptionQuality, "Best") { showMessage("Quality options land in a later milestone") }
-        HairlineDivider()
-        NavRow("Default mode", state.defaultMode, "Codemix") { showMessage("Mode options land in a later milestone") }
-        HairlineDivider()
         ToggleRow("Battery & cost saver", "Skip silence with on-device VAD", state.batterySaver, onBatterySaver)
         HairlineDivider()
         ToggleRow("Local-only mode", "Never send audio; queue for later", state.localOnly, onLocalOnly)
@@ -111,6 +127,80 @@ internal fun SettingsContent(
         Box(Modifier.height(VaaniSpacing.sm))
         DeleteRow(onDelete = { showMessage("Delete everything — confirm dialog lands in a later milestone") })
         Box(Modifier.height(VaaniSpacing.xxl))
+    }
+
+    if (showKeyDialog) {
+        ApiKeyDialog(
+            onDismiss = { showKeyDialog = false },
+            onSave = { key ->
+                onSaveApiKey(key)
+                showKeyDialog = false
+                showMessage(if (key.isBlank()) "Sarvam key cleared" else "Sarvam key saved")
+            },
+        )
+    }
+}
+
+/** Shows which backend is actually driving each stage right now (real state). */
+@Composable
+private fun ActiveEnginesCard(state: SettingsUiState) {
+    val colors = VaaniTheme.colors
+    fun label(b: AiBackend, modelName: String?) = when (b) {
+        // Name the REAL on-device model per stage (Whisper for ASR, the chosen LLM
+        // for enrichment) — never hardcode Whisper for both.
+        AiBackend.LOCAL -> modelName?.let { "On-device · $it" } ?: "On-device · no model installed"
+        AiBackend.SARVAM -> if (state.apiKeyPresent) "Sarvam API" else "Sarvam API · no key"
+    }
+    Column(Modifier.fillMaxWidth().background(colors.surface).padding(VaaniSpacing.lg)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Speech-to-text", color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.weight(1f))
+            Text(label(state.asrBackend, state.asrModelName), color = colors.ink, style = MaterialTheme.typography.titleSmall)
+        }
+        Box(Modifier.height(VaaniSpacing.sm))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Enrichment", color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.weight(1f))
+            Text(label(state.enrichBackend, state.enrichModelName), color = colors.ink, style = MaterialTheme.typography.titleSmall)
+        }
+    }
+}
+
+@Composable
+private fun ApiKeyDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    val colors = VaaniTheme.colors
+    var text by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().background(colors.surface).padding(VaaniSpacing.lg),
+        ) {
+            Text("Sarvam API key", color = colors.ink, style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Billed to your own Sarvam account. Stored on-device.",
+                color = colors.muted,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Normal,
+                modifier = Modifier.padding(top = 4.dp, bottom = VaaniSpacing.md),
+            )
+            androidx.compose.foundation.text.BasicTextField(
+                value = text,
+                onValueChange = { text = it },
+                singleLine = true,
+                textStyle = MonoStyle.copy(color = colors.ink),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.sunken)
+                    .border(VaaniSpacing.hairline, colors.hairline)
+                    .padding(VaaniSpacing.md),
+            )
+            Row(Modifier.fillMaxWidth().padding(top = VaaniSpacing.md), horizontalArrangement = Arrangement.spacedBy(VaaniSpacing.md)) {
+                VaaniOutlineButton(label = "Cancel", onClick = onDismiss, modifier = Modifier.weight(1f))
+                Box(
+                    Modifier.weight(1f).height(44.dp).background(colors.coffee).clickable { onSave(text) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("Save", color = colors.onCoffee, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
     }
 }
 
@@ -179,7 +269,7 @@ private fun EngineSegment(
 }
 
 @Composable
-private fun ApiKeyCard(masked: String, onManage: () -> Unit) {
+private fun ApiKeyCard(present: Boolean, masked: String, onManage: () -> Unit) {
     val colors = VaaniTheme.colors
     Row(
         Modifier
@@ -189,40 +279,21 @@ private fun ApiKeyCard(masked: String, onManage: () -> Unit) {
             .clickable(onClick = onManage),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.width(VaaniSpacing.accentBar).fillMaxHeight().background(colors.coffee))
+        Box(Modifier.width(VaaniSpacing.accentBar).fillMaxHeight().background(if (present) colors.coffee else colors.hairline))
         Column(Modifier.weight(1f).padding(VaaniSpacing.lg)) {
             Text("Sarvam API key", color = colors.ink, style = MaterialTheme.typography.titleMedium)
             Text(masked, color = colors.muted, style = MonoStyle, modifier = Modifier.padding(top = 4.dp))
             Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(Modifier.size(10.dp).background(colors.success))
-                Text("Billed to your account", color = colors.secondary, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
+                Box(Modifier.size(10.dp).background(if (present) colors.success else colors.muted))
+                Text(
+                    if (present) "Billed to your account" else "Optional — on-device works without it",
+                    color = colors.secondary,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Normal,
+                )
             }
         }
-        Text("Manage", color = colors.slate, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(end = VaaniSpacing.lg))
-    }
-}
-
-@Composable
-private fun BudgetCard(state: SettingsUiState, onAdjustCap: () -> Unit) {
-    val colors = VaaniTheme.colors
-    Column(Modifier.fillMaxWidth().background(colors.surface).padding(VaaniSpacing.lg)) {
-        Text("MONTHLY BUDGET", style = OverlineStyle, color = colors.muted)
-        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.Bottom) {
-            Text(state.budgetSpentLabel, color = colors.ink, style = MaterialTheme.typography.displaySmall)
-            Text(
-                "  ${state.budgetCapLabel}",
-                color = colors.muted,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(bottom = 4.dp),
-            )
-        }
-        Box(Modifier.fillMaxWidth().height(6.dp).background(colors.sunken)) {
-            Box(Modifier.fillMaxWidth(state.budgetProgress).height(6.dp).background(colors.coffee))
-        }
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(state.budgetDetail, color = colors.muted, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal, modifier = Modifier.weight(1f))
-            VaaniOutlineButton(label = "Adjust cap", onClick = onAdjustCap)
-        }
+        Text(if (present) "Change" else "Add", color = colors.slate, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(end = VaaniSpacing.lg))
     }
 }
 

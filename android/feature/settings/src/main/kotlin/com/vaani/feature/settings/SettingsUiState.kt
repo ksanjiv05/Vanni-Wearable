@@ -4,17 +4,17 @@ import com.vaani.domain.ai.AiBackend
 
 /** Immutable UI state for the Settings screen. */
 data class SettingsUiState(
-    val apiKeyMasked: String = "sk_live ···· 4c9a · validated",
-    val budgetSpentLabel: String = "₹1,204",
-    val budgetCapLabel: String = "of ₹1,800 cap",
-    val budgetProgress: Float = 0.67f,
-    val budgetDetail: String = "67% used · ASR is 86% of spend",
-    val transcriptionQuality: String = "Best (batch + diarization)",
-    val defaultMode: String = "Codemix · Hinglish",
+    /** True once a real Sarvam API key is stored; drives the key card copy. */
+    val apiKeyPresent: Boolean = false,
+    val apiKeyMasked: String = "",
+    val transcriptionQuality: String = "Standard (on-device)",
+    val defaultMode: String = "Auto-detect language",
     val batterySaver: Boolean = true,
     val localOnly: Boolean = false,
-    /** Per-stage AI backend choice (ADR-001). */
-    val asrBackend: AiBackend = AiBackend.SARVAM,
-    val enrichBackend: AiBackend = AiBackend.SARVAM,
+    /** Per-stage AI backend choice (ADR-001). Defaults on-device (privacy-first). */
+    val asrBackend: AiBackend = AiBackend.LOCAL,
+    val enrichBackend: AiBackend = AiBackend.LOCAL,
+    /** Human names of the on-device models actually in use (null when none installed / not LOCAL). */
+    val asrModelName: String? = null,
+    val enrichModelName: String? = null,
 )
-

@@ -2,6 +2,7 @@ package com.vaani.domain.repository
 
 import com.vaani.domain.model.Note
 import com.vaani.domain.model.PipelineState
+import com.vaani.domain.model.TodoStatus
 import com.vaani.domain.model.Transcript
 
 /**
@@ -24,4 +25,10 @@ interface NotesWriter {
 
     /** Updates the pipeline state of the underlying recording. */
     suspend fun setRecordingPipelineState(recordingId: String, state: PipelineState)
+
+    /**
+     * Persists a single to-do's completion state (durable across sessions).
+     * [completedAtEpochMs] is the moment it was marked DONE (null when reopened).
+     */
+    suspend fun setTodoStatus(todoId: String, status: TodoStatus, completedAtEpochMs: Long?)
 }

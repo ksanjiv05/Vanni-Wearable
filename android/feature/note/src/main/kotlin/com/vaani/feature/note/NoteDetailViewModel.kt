@@ -5,11 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vaani.core.common.formatClock
 import com.vaani.core.designsystem.component.ChipVariant
+import com.vaani.domain.audio.AudioPlayer
 import com.vaani.domain.model.Note
 import com.vaani.domain.model.TodoStatus
 import com.vaani.domain.model.Transcript
 import com.vaani.domain.model.TranscriptSegment
 import com.vaani.domain.repository.NotesRepository
+import com.vaani.domain.repository.RecordingStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +27,10 @@ const val NOTE_ID_ARG = "noteId"
 
 @HiltViewModel
 class NoteDetailViewModel @Inject constructor(
-    repository: NotesRepository,
+    private val repository: NotesRepository,
+    private val writer: com.vaani.domain.repository.NotesWriter,
+    private val recordings: RecordingStore,
+    private val audioPlayer: AudioPlayer,
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -33,6 +38,9 @@ class NoteDetailViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(NoteDetailUiState(isLoading = true))
     val uiState: StateFlow<NoteDetailUiState> = _uiState.asStateFlow()
+
+    /** True once the recording's audio file has been handed to the player. */
+    private var audioLoaded = false
 
     init {
         val id = noteId
@@ -48,23 +56,55 @@ class NoteDetailViewModel @Inject constructor(
                     .collect { (note, transcript) ->
                         _uiState.value = note?.toDetailState(transcript)
                             ?: NoteDetailUiState(isLoading = false, isError = true)
+                        // Load the real audio file into the player once we know the
+                        // recording (its content-addressed path is the playback source).
+                        if (note != null && !audioLoaded) loadAudio(note.recordingId)
                     }
+            }
+            // Reflect real Media3 playback state (position/duration/isPlaying) live.
+            viewModelScope.launch {
+                audioPlayer.state.collect { p ->
+                    _uiState.update {
+                        it.copy(
+                            player = it.player.copy(
+                                isPlaying = p.isPlaying,
+                                positionLabel = formatClock(p.positionMs),
+                                durationLabel = formatClock(p.durationMs.coerceAtLeast(0)),
+                                progress = if (p.durationMs > 0) {
+                                    (p.positionMs.toFloat() / p.durationMs).coerceIn(0f, 1f)
+                                } else 0f,
+                            ),
+                        )
+                    }
+                }
             }
         }
     }
 
+    private suspend fun loadAudio(recordingId: String) {
+        val uri = recordings.get(recordingId)?.storageUri ?: return
+        audioLoaded = true
+        audioPlayer.load(uri)
+    }
+
     fun toggleTodo(id: String) {
-        _uiState.update { state ->
-            state.copy(
-                todos = state.todos.map {
-                    if (it.id == id) it.copy(done = !it.done) else it
-                },
-            )
-        }
+        // Persist to Room; the note flow re-emits with the new status, so no local
+        // UI-state mutation is needed (and it survives navigation/relaunch).
+        val current = _uiState.value.todos.firstOrNull { it.id == id }?.done ?: false
+        val newStatus = if (current) com.vaani.domain.model.TodoStatus.OPEN else com.vaani.domain.model.TodoStatus.DONE
+        val completedAt = if (newStatus == com.vaani.domain.model.TodoStatus.DONE) System.currentTimeMillis() else null
+        viewModelScope.launch { writer.setTodoStatus(id, newStatus, completedAt) }
     }
 
     fun togglePlay() {
-        _uiState.update { it.copy(player = it.player.copy(isPlaying = !it.player.isPlaying)) }
+        if (_uiState.value.player.isPlaying) audioPlayer.pause() else audioPlayer.play()
+    }
+
+    override fun onCleared() {
+        // AudioPlayer is an app-scoped singleton — do NOT release it here or a
+        // second note-open gets a dead player (0:00, no sound). Just stop playback.
+        audioPlayer.pause()
+        super.onCleared()
     }
 
     private fun Note.toDetailState(transcript: Transcript?): NoteDetailUiState {

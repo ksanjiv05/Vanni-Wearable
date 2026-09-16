@@ -27,14 +27,15 @@ internal object NotesSeedData {
     private val base: Instant = Instant.parse("2026-09-14T09:32:00Z")
     private val yesterday: Instant = Instant.parse("2026-09-13T15:10:00Z")
 
-    // TODO(sync): replace with a real device→phone sync source when it lands.
+    // No real device→phone sync layer yet, so report IDLE (no banner) rather than a
+    // fabricated "Syncing 3 recordings · 34%" that never completes on an empty install.
     val syncStatus = SyncStatus(
-        isSyncing = true,
-        pendingRecordings = 3,
-        pendingBytes = 47L * 1024 * 1024,
-        progress = 0.34f,
-        transport = "Wi-Fi",
-        lastSyncedLabel = "Synced 2m",
+        isSyncing = false,
+        pendingRecordings = 0,
+        pendingBytes = 0L,
+        progress = 0f,
+        transport = "",
+        lastSyncedLabel = "",
     )
 
     private val transcriptStandup: List<TranscriptSegment> = listOf(
@@ -136,10 +137,92 @@ internal object NotesSeedData {
         pipelineState = PipelineState.READY,
     )
 
-    val notes: List<Note> = listOf(standup, vendor, designReview)
+    // ------------------------------------------------------------------------
+    // REAL end-to-end result: the Springfield 09-01-2026 Council Meeting audio,
+    // transcribed on-device-style with Whisper (base) and enriched by the local
+    // Qwen2.5-1.5B GGUF LLM (llama.cpp) — no cloud. Seeded so the actual app UI
+    // (Library, Note detail, Tasks, Search) renders a genuinely-extracted note.
+    // ------------------------------------------------------------------------
+    private val councilSegments: List<TranscriptSegment> = listOf(
+        TranscriptSegment("cseg0", "t-council", 0, 2_300, 8_600, "S1",
+            "I'm Mayor Patrick Terry and I'm calling the meeting to order.", 0.90f),
+        TranscriptSegment("cseg1", "t-council", 1, 11_800, 13_100, "S1",
+            "It is the 1st of September of 2026.", 0.88f),
+        TranscriptSegment("cseg2", "t-council", 2, 13_100, 22_400, "S1",
+            "All council is present: deputy mayor Fule, councillors Kaczynski, Miller and Warren.", 0.87f),
+        TranscriptSegment("cseg3", "t-council", 3, 689_000, 711_000, "S1",
+            "Departmental reports adopted, unanimous, so carried.", 0.86f),
+        TranscriptSegment("cseg4", "t-council", 4, 722_900, 830_000, "S1",
+            "First reading given to bylaw 2610, to close a municipal road and sale of land at Lana road; " +
+                "it replaces bylaw 2607 that land titles rejected over a company-name mismatch.", 0.84f),
+        TranscriptSegment("cseg5", "t-council", 5, 845_700, 872_000, "S1",
+            "Unfinished business: Bell MTS tower letter of concurrence, deferred from the August 27th " +
+                "planning meeting so Lincrest Airport objectors could review it.", 0.85f),
+        TranscriptSegment("cseg6", "t-council", 6, 1_146_500, 1_260_000, "S1",
+            "Council moved to defer the Bell MTS letter to another planning meeting so Lincrest Airport " +
+                "can be consulted on the 25% height rule.", 0.83f),
+    )
+
+    private val council = Note(
+        id = "note-council",
+        recordingId = "rec-council",
+        title = "Springfield Council — Sept 1, 2026",
+        summaryShort = "Reports adopted; bylaw 2610 first reading; Bell MTS tower deferred.",
+        summaryLong = "Mayor Patrick Terry opened the September 1, 2026 meeting with full council present. " +
+            "Departmental reports were adopted unanimously. Bylaw 2610 (closing and selling the Lana road) " +
+            "received first reading after land titles rejected bylaw 2607 for a company-name mismatch, " +
+            "restarting the public-hearing process. On unfinished business, the Bell MTS tower letter of " +
+            "concurrence — deferred from the August 27 planning meeting — was moved to a further planning " +
+            "meeting so Lincrest Airport can be consulted about the 25% height rule.",
+        languageCode = "en-CA",
+        createdAt = base,
+        updatedAt = base,
+        pinned = true,
+        archived = false,
+        userEdited = false,
+        tags = listOf(
+            Tag("tag-council", "council"), Tag("tag-bylaw", "bylaw"),
+            Tag("tag-bellmts", "bell-mts"), Tag("tag-zoning", "zoning"),
+        ),
+        keyPoints = listOf(
+            KeyPoint("ckp0", "note-council", 0, "Departmental reports adopted unanimously", "cseg3", 689_000),
+            KeyPoint("ckp1", "note-council", 1, "Bylaw 2610 given first reading (closes/sells Lana road); replaces rejected 2607", "cseg4", 722_900),
+            KeyPoint("ckp2", "note-council", 2, "Bell MTS tower letter of concurrence deferred for Lincrest Airport review", "cseg5", 845_700),
+            KeyPoint("ckp3", "note-council", 3, "Three objectors withdrew on the basis the tower is ≤ 45 metres", null, 1_219_800),
+        ),
+        todos = listOf(
+            Todo("ctd0", "note-council", "Hold public hearing for bylaw 2610, then proceed to second and third reading",
+                null, "Administration", Priority.HIGH, TodoStatus.OPEN, "cseg4", 780_700, null),
+            Todo("ctd1", "note-council", "Consult Lincrest Airport on the Bell MTS tower 25% height rule",
+                "next planning meeting", "CAO", Priority.HIGH, TodoStatus.OPEN, "cseg6", 1_146_500, null),
+            Todo("ctd2", "note-council", "Notify the purchasers of the Lana road sale delay",
+                null, "Administration", Priority.MEDIUM, TodoStatus.OPEN, "cseg4", 791_600, null),
+        ),
+        entities = listOf(
+            Entity("ce0", EntityType.PERSON, "Mayor Patrick Terry", 2),
+            Entity("ce1", EntityType.ORG, "Bell MTS", 3),
+            Entity("ce2", EntityType.PLACE, "Lincrest Airport", 3),
+        ),
+        durationMs = 1_320_000, // 00:22:00 processed window
+        speakerCount = 3,
+        pipelineState = PipelineState.READY,
+    )
+
+    val notes: List<Note> = listOf(council, standup, vendor, designReview)
 
     /** recordingId -> Transcript for the notes that have one (standup only). */
     val transcripts: Map<String, Transcript> = mapOf(
+        council.recordingId to Transcript(
+            id = "t-council",
+            recordingId = "rec-council",
+            provider = "local",
+            model = "whisper-base + qwen2.5-1.5b",
+            mode = "transcribe",
+            languageCode = "en-CA",
+            fullText = councilSegments.joinToString(" ") { it.text },
+            createdAt = base,
+            segments = councilSegments,
+        ),
         standup.recordingId to Transcript(
             id = "t1",
             recordingId = "rec-1",
@@ -156,6 +239,12 @@ internal object NotesSeedData {
     /** recordingId -> Recording. Every seeded note needs a parent recording row
      *  (note.recordingId → recording FK is implicit via the seed order). */
     val recordings: List<Recording> = listOf(
+        Recording(
+            id = "rec-council", deviceId = "dev-1", sessionUlid = "01J-COUNCIL",
+            startedAt = base, tzOffsetMinutes = 330, durationMs = 1_320_000,
+            codec = "mp3", sampleRate = 16_000, sha256 = "council2026", bytes = 59_003_297,
+            storageUri = null, syncState = SyncState.ACKED, pipelineState = PipelineState.READY,
+        ),
         Recording(
             id = "rec-1", deviceId = "dev-1", sessionUlid = "01J-STANDUP",
             startedAt = base, tzOffsetMinutes = 330, durationMs = 860_000,

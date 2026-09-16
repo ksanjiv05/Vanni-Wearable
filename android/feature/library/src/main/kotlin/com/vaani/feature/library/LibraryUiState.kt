@@ -7,7 +7,18 @@ data class LibraryUiState(
     val recordedLabel: String = "",
     val syncedLabel: String = "",
     val sync: SyncBannerState? = null,
+    val processing: List<ProcessingRow> = emptyList(),
     val groups: List<DayGroup> = emptyList(),
+)
+
+/** An in-flight or failed recording shown above the notes so it's never invisible. */
+data class ProcessingRow(
+    val recordingId: String,
+    val title: String,
+    val statusLabel: String,
+    val statusVariant: com.vaani.core.designsystem.component.ChipVariant,
+    val meta: String,
+    val isFailed: Boolean,
 )
 
 /** A day-grouped section of note rows (TODAY / YESTERDAY / date). */
