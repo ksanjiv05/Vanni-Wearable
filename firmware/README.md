@@ -74,8 +74,25 @@ On boot it starts a Wi-Fi SoftAP `Vaani-XXXX` (WPA2) with an HTTP REST server at
   the loop core; the shared SPI bus would corrupt without it).
 - Per-device SSID suffix from the SoftAP MAC.
 
-### ⚠️ Not yet hardened (known, deferred)
+## Security (v4)
 
-No BLE pairing/encryption, no REST auth, and a hardcoded shared Wi-Fi passphrase. Anyone in
-radio/AP range can read or wipe recordings. Add BLE bonding + a per-device provisioned PSK (stored in
-NVS, not source) + a REST token before using this with real private recordings.
+The encrypted BLE link is the **root of trust**; Wi-Fi is derived from it.
+
+- **Per-device secrets, never hardcoded.** On first boot the firmware generates a random 16-char
+  Wi-Fi PSK and a 32-char REST token from the hardware RNG and persists them in NVS (`Preferences`).
+  They are never printed to serial or shown on the TFT.
+- **BLE bonding + encryption.** All characteristics are `ENCRYPTED`-permission; the server uses
+  Secure-Connections bonding with Just-Works pairing (no I/O for a passkey). The phone bonds on
+  first connect; keys persist so re-pairing is automatic.
+- **CRED provisioning.** Over the bonded/encrypted link the phone sends `CRED` and receives
+  `{ssid, psk, token}`. Reaching this handler at all proves the peer is encrypted.
+- **REST token auth.** Every `/api/*` call must present `Authorization: Bearer <token>` (or
+  `?token=`); without it the firmware returns `401`. The upload handler checks auth at
+  `UPLOAD_FILE_START` so an unauthorized body never touches the SD card.
+
+App flow: BLE connect → bond → `CRED` → join Wi-Fi with the provisioned PSK → all REST calls carry
+the bearer token.
+
+### To reset a device's identity (re-provision)
+Erase NVS (`nvs_flash_erase` / full flash erase) — the next boot generates fresh secrets. Also
+remove the old bond from the phone's Bluetooth settings.

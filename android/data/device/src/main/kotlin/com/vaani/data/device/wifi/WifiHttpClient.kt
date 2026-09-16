@@ -21,11 +21,16 @@ class WifiHttpClient @Inject constructor() {
     // Rebuilt whenever the bound network changes so sockets open on the AP interface.
     @Volatile private var network: Network? = null
     @Volatile private var http: OkHttpClient = build(null)
+    // Per-device REST token, provisioned over encrypted BLE (CRED). Sent as a Bearer header on
+    // every call; without it the firmware returns 401.
+    @Volatile private var token: String? = null
 
     fun useNetwork(net: Network?) {
         network = net
         http = build(net)
     }
+
+    fun setToken(t: String?) { token = t }
 
     private fun build(net: Network?): OkHttpClient {
         val b = OkHttpClient.Builder()
@@ -40,12 +45,17 @@ class WifiHttpClient @Inject constructor() {
         return b.build()
     }
 
+    private fun Request.Builder.auth(): Request.Builder {
+        token?.let { header("Authorization", "Bearer $it") }
+        return this
+    }
+
     fun info(): String = get("/api/info")
 
     fun listFiles(path: String): String = get("/api/files?path=${enc(path)}")
 
     fun readFile(path: String): ByteArray {
-        val req = Request.Builder().url("$baseUrl/api/file?path=${enc(path)}").build()
+        val req = Request.Builder().url("$baseUrl/api/file?path=${enc(path)}").auth().build()
         http.newCall(req).execute().use { r ->
             if (!r.isSuccessful) throw RuntimeException("HTTP ${r.code}")
             return r.body?.bytes() ?: ByteArray(0)
@@ -61,7 +71,7 @@ class WifiHttpClient @Inject constructor() {
                 bytes.toRequestBody("application/octet-stream".toMediaTypeOrNull()),
             )
             .build()
-        val req = Request.Builder().url("$baseUrl/api/upload?path=${enc(path)}").post(body).build()
+        val req = Request.Builder().url("$baseUrl/api/upload?path=${enc(path)}").auth().post(body).build()
         http.newCall(req).execute().use { r ->
             if (!r.isSuccessful) throw RuntimeException("HTTP ${r.code}")
             return r.body?.string() ?: ""
@@ -71,7 +81,7 @@ class WifiHttpClient @Inject constructor() {
     fun deleteFile(path: String): String = get("/api/delete?path=${enc(path)}")
 
     private fun get(pathAndQuery: String): String {
-        val req = Request.Builder().url("$baseUrl$pathAndQuery").build()
+        val req = Request.Builder().url("$baseUrl$pathAndQuery").auth().build()
         http.newCall(req).execute().use { r ->
             if (!r.isSuccessful) throw RuntimeException("HTTP ${r.code}")
             return r.body?.string() ?: ""

@@ -63,50 +63,72 @@ class DeviceLinkImpl @Inject constructor(
 
     override suspend fun connect(device: DiscoveredDevice): Outcome<DeviceInfo> = withContext(Dispatchers.IO) {
         _status.value = LinkStatus(LinkState.CONNECTING, deviceName = device.name)
-        // PRIMARY: Wi-Fi — the app joins the wearable's SoftAP (system approval dialog). Only the
-        // app's wearable HTTP is routed to the AP (via network.socketFactory); the rest of the app
-        // keeps its normal network. Far faster than BLE for audio.
-        try {
-            val net = wifiAp.connect(ssid = device.name, passphrase = AP_PASSPHRASE)
-            if (net != null) {
-                wifi.useNetwork(net)
-                // Route can lag a moment after the network binds → retry the first fetch.
-                var info: DeviceInfo? = null
-                repeat(12) {
-                    if (info == null) {
-                        val v = runCatching { parseInfo(wifi.info(), LinkTransport.WIFI) }.getOrNull()
-                        if (v != null) info = v else kotlinx.coroutines.delay(800)
-                    }
-                }
-                if (info != null) {
-                    active = LinkTransport.WIFI
-                    _status.value = LinkStatus(LinkState.CONNECTED, LinkTransport.WIFI, device.name, info)
-                    return@withContext Outcome.Ok(info!!)
-                }
-            }
-        } catch (c: kotlinx.coroutines.CancellationException) {
-            wifiAp.disconnect(); wifi.useNetwork(null); throw c
-        } catch (_: Throwable) { /* fall through to BLE */ }
-        wifiAp.disconnect(); wifi.useNetwork(null)
-        // FALLBACK: BLE (always available, slower for bulk audio)
-        if (ble.isEnabled() && ble.hasPermissions() && ble.connect(device.id)) {
-            val parsed = ble.command("INFO")?.toString(Charsets.UTF_8)?.let { parseInfo(it, LinkTransport.BLE) }
-            if (parsed != null) {
-                active = LinkTransport.BLE
-                _status.value = LinkStatus(LinkState.CONNECTED, LinkTransport.BLE, device.name, parsed,
-                    message = "Connected over Bluetooth (Wi-Fi unavailable)")
-                return@withContext Outcome.Ok(parsed)
-            }
-            ble.disconnect()
+        // BLE is the ENCRYPTED ROOT OF TRUST. It must come first: the wearable's WiFi PSK and REST
+        // token are per-device secrets that are ONLY handed out over the bonded/encrypted BLE link
+        // (CRED command). Android auto-bonds (Just Works) on first access to an encrypted
+        // characteristic. Once we have the creds we try WiFi (far faster for bulk audio) using the
+        // PROVISIONED PSK — no hardcoded passphrase anywhere.
+        if (!(ble.isEnabled() && ble.hasPermissions())) {
+            _status.value = LinkStatus(LinkState.ERROR, message = "Bluetooth is required to pair with the wearable")
+            return@withContext Outcome.Err(AppError.Network("Bluetooth unavailable — cannot pair"))
         }
-        _status.value = LinkStatus(LinkState.ERROR, message = "Could not connect over Wi-Fi or Bluetooth")
-        Outcome.Err(AppError.Network("Could not reach the device over Wi-Fi or Bluetooth"))
+        if (!ble.connect(device.id)) {
+            _status.value = LinkStatus(LinkState.ERROR, message = "Could not pair over Bluetooth")
+            return@withContext Outcome.Err(AppError.Network("BLE pairing failed"))
+        }
+        // Provision secrets over the encrypted link.
+        val creds = runCatching {
+            ble.command("CRED")?.toString(Charsets.UTF_8)?.let { parseCreds(it) }
+        }.getOrNull()
+        val bleInfo = ble.command("INFO")?.toString(Charsets.UTF_8)?.let { parseInfo(it, LinkTransport.BLE) }
+        if (bleInfo == null) {
+            ble.disconnect()
+            _status.value = LinkStatus(LinkState.ERROR, message = "No response from wearable")
+            return@withContext Outcome.Err(AppError.Network("No device info after pairing"))
+        }
+        wifi.setToken(creds?.token)   // REST calls now carry the per-device bearer token
+
+        // Try to upgrade to WiFi using the provisioned SSID + PSK (system approval dialog once).
+        if (creds != null && creds.psk.isNotEmpty()) {
+            try {
+                val ssid = creds.ssid.ifEmpty { device.name }
+                val net = wifiAp.connect(ssid = ssid, passphrase = creds.psk)
+                if (net != null) {
+                    wifi.useNetwork(net)
+                    var wifiInfo: DeviceInfo? = null
+                    repeat(12) {
+                        if (wifiInfo == null) {
+                            val v = runCatching { parseInfo(wifi.info(), LinkTransport.WIFI) }.getOrNull()
+                            if (v != null) wifiInfo = v else kotlinx.coroutines.delay(800)
+                        }
+                    }
+                    if (wifiInfo != null) {
+                        active = LinkTransport.WIFI
+                        _status.value = LinkStatus(LinkState.CONNECTED, LinkTransport.WIFI, device.name, wifiInfo)
+                        return@withContext Outcome.Ok(wifiInfo!!)
+                    }
+                    // WiFi didn't come up — release and keep the working BLE link.
+                    wifiAp.disconnect(); wifi.useNetwork(null)
+                }
+            } catch (c: kotlinx.coroutines.CancellationException) {
+                wifiAp.disconnect(); wifi.useNetwork(null); ble.disconnect(); throw c
+            } catch (_: Throwable) {
+                wifiAp.disconnect(); wifi.useNetwork(null)
+            }
+        }
+        // Stay on the already-connected (encrypted) BLE link.
+        active = LinkTransport.BLE
+        _status.value = LinkStatus(LinkState.CONNECTED, LinkTransport.BLE, device.name, bleInfo,
+            message = if (creds == null) "Connected over Bluetooth (provisioning unavailable)"
+                      else "Connected over Bluetooth")
+        Outcome.Ok(bleInfo)
     }
 
     override suspend fun disconnect() = withContext(Dispatchers.IO) {
         runCatching { ble.disconnect() }
         runCatching { wifiAp.disconnect() }
         runCatching { wifi.useNetwork(null) }
+        runCatching { wifi.setToken(null) }
         active = null
         _status.value = LinkStatus(LinkState.DISCONNECTED)
     }
@@ -195,8 +217,16 @@ class DeviceLinkImpl @Inject constructor(
 
     override fun syncRecordings(): Flow<com.vaani.domain.device.SyncProgress> = syncManager.sync(this)
 
-    private companion object {
-        const val AP_PASSPHRASE = "vaani12345"
+    private data class Creds(val ssid: String, val psk: String, val token: String)
+
+    private fun parseCreds(json: String): Creds? {
+        val start = json.indexOf('{')
+        if (start < 0) return null
+        val o = JSONObject(json.substring(start))
+        val psk = o.optString("psk", "")
+        val token = o.optString("token", "")
+        if (psk.isEmpty() && token.isEmpty()) return null
+        return Creds(o.optString("ssid", ""), psk, token)
     }
 
     private fun parseInfo(json: String, transport: LinkTransport): DeviceInfo {

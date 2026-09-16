@@ -193,8 +193,13 @@ class BleGattClient @Inject constructor(
                 if (sok) {
                     runCatching { gatt?.requestMtu(517) }
                     kotlinx.coroutines.delay(200)
+                    // Ensure the link is bonded/encrypted BEFORE any command. The characteristics
+                    // require encryption; issuing a WRITE_NO_RESPONSE command before bonding
+                    // completes would be silently dropped. createBond() is idempotent (returns fast
+                    // if already bonded from a previous session — keys persist on both sides).
+                    ensureBonded(dev)
                     enableNotifications()
-                    kotlinx.coroutines.delay(200)
+                    kotlinx.coroutines.delay(300)
                     established = true
                     return true
                 }
@@ -214,6 +219,35 @@ class BleGattClient @Inject constructor(
         cccd.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
         @Suppress("DEPRECATION")
         gatt?.writeDescriptor(cccd)
+    }
+
+    /**
+     * Bond (pair + encrypt) with the wearable and wait until it completes. The firmware's
+     * characteristics are encryption-required, so we must be bonded before issuing any command.
+     * If already bonded (keys persisted from a prior session) this returns immediately.
+     */
+    @SuppressLint("MissingPermission")
+    private suspend fun ensureBonded(dev: android.bluetooth.BluetoothDevice) {
+        if (dev.bondState == android.bluetooth.BluetoothDevice.BOND_BONDED) return
+        val bonded = CompletableDeferred<Boolean>()
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(c: Context, i: android.content.Intent) {
+                val d = i.getParcelableExtra<android.bluetooth.BluetoothDevice>(android.bluetooth.BluetoothDevice.EXTRA_DEVICE)
+                if (d?.address != dev.address) return
+                val state = i.getIntExtra(android.bluetooth.BluetoothDevice.EXTRA_BOND_STATE, -1)
+                if (state == android.bluetooth.BluetoothDevice.BOND_BONDED) { if (!bonded.isCompleted) bonded.complete(true) }
+                else if (state == android.bluetooth.BluetoothDevice.BOND_NONE) { if (!bonded.isCompleted) bonded.complete(false) }
+            }
+        }
+        runCatching {
+            context.registerReceiver(receiver, android.content.IntentFilter(android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED))
+        }
+        try {
+            if (dev.bondState != android.bluetooth.BluetoothDevice.BOND_BONDED) dev.createBond()
+            withTimeoutOrNull(20_000) { bonded.await() }
+        } finally {
+            runCatching { context.unregisterReceiver(receiver) }
+        }
     }
 
     @SuppressLint("MissingPermission")

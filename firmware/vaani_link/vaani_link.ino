@@ -24,7 +24,10 @@
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
+#include <BLESecurity.h>
 #include <BLE2902.h>
+#include <Preferences.h>
+#include <esp_random.h>
 
 // ---- shared SPI ----
 #define SCLK 12
@@ -40,9 +43,33 @@ Adafruit_ST7735 tft = Adafruit_ST7735(&spiBus, TFT_CS, TFT_DC, TFT_RST);
 WebServer server(80);
 
 bool sdOk = false;
-String apSsid, apPass = "vaani12345", apIp;
+// Per-device secrets — generated randomly at first boot, persisted in NVS. NEVER hardcoded and
+// NEVER printed to serial/TFT. Handed to the phone only over the encrypted+bonded BLE link (CRED).
+Preferences prefs;
+String apSsid, apPass, apIp, restToken;
 volatile uint32_t reqCount = 0;
 SemaphoreHandle_t spiMutex;   // serialises SD (BLE-callback core) vs TFT (loop core) on the shared bus
+
+// Random lowercase-hex string of n chars, sourced from the hardware RNG.
+String randHex(size_t n){
+  static const char* h = "0123456789abcdef";
+  String s; s.reserve(n);
+  while(s.length() < n){ uint32_t r = esp_random(); for(int i=0;i<8 && s.length()<n;i++){ s += h[(r>>(i*4))&0xF]; } }
+  return s;
+}
+
+// Load PSK + REST token from NVS; generate+persist on first boot (or if wiped/too short).
+void loadOrCreateCreds(){
+  prefs.begin("vaani", false);
+  apPass    = prefs.getString("psk", "");
+  restToken = prefs.getString("tok", "");
+  bool changed = false;
+  if(apPass.length() < 12){    apPass    = randHex(16); prefs.putString("psk", apPass); changed = true; }  // WPA2 PSK (>=8)
+  if(restToken.length() < 24){ restToken = randHex(32); prefs.putString("tok", restToken); changed = true; }
+  prefs.end();
+  Serial.printf("creds: %s (psk %d chars, token %d chars) [not shown]\n",
+                changed?"generated+stored":"loaded from NVS", apPass.length(), restToken.length());
+}
 
 // DATA-characteristic frame opcodes (byte 0 of every notification). Structural, so raw
 // binary payload can NEVER be mistaken for a control marker (fixes marker/binary collision).
@@ -192,6 +219,12 @@ class CmdCb : public BLECharacteristicCallbacks {
     String cmd = sp<0? v : v.substring(0,sp);
     String arg = sp<0? ""  : v.substring(sp+1);
     if(cmd=="INFO"){ notifyChunked(infoJson()); notifyEnd(); }
+    else if(cmd=="CRED"){
+      // Provision the phone with per-device WiFi + REST secrets. Only reachable over the
+      // encryption-required CMD characteristic, so the peer is already bonded/encrypted.
+      String j = "{\"ssid\":\"" + apSsid + "\",\"psk\":\"" + apPass + "\",\"token\":\"" + restToken + "\"}";
+      notifyChunked(j); notifyEnd();
+    }
     else if(cmd=="LIST"){ bleList(arg); }
     else if(cmd=="RN"){ bleReadBlock(arg); }
     else if(cmd=="WRITE"){
@@ -222,31 +255,48 @@ class SrvCb : public BLEServerCallbacks {
 
 // ---- HTTP (WiFi transport) ----
 void sendJson(int code,const String&b){ server.sendHeader("Access-Control-Allow-Origin","*"); server.send(code,"application/json",b); }
-void hInfo(){ reqCount++; sendJson(200, infoJson()); }
-void hFiles(){ reqCount++; if(!sdOk){sendJson(503,"{\"error\":\"no sd\"}");return;} String p=server.hasArg("path")?server.arg("path"):"/"; xSemaphoreTake(spiMutex, portMAX_DELAY); File d=SD.open(p); if(!d||!d.isDirectory()){ if(d) d.close(); xSemaphoreGive(spiMutex); sendJson(404,"{\"error\":\"not dir\"}");return;} String j="{\"path\":\""+p+"\",\"files\":["; bool fst=true; for(File f=d.openNextFile();f;f=d.openNextFile()){ if(!fst)j+=","; fst=false; j+="{\"name\":\""+String(f.name())+"\",\"size\":"+String((uint32_t)f.size())+",\"dir\":"+(f.isDirectory()?"true":"false")+"}"; f.close(); } d.close(); xSemaphoreGive(spiMutex); j+="]}"; sendJson(200,j); }
-void hRead(){ reqCount++; if(!sdOk){sendJson(503,"{\"error\":\"no sd\"}");return;} if(!server.hasArg("path")){sendJson(400,"{\"error\":\"path\"}");return;} String p=server.arg("path"); xSemaphoreTake(spiMutex, portMAX_DELAY); if(!SD.exists(p)){ xSemaphoreGive(spiMutex); sendJson(404,"{\"error\":\"not found\"}");return;} File f=SD.open(p,FILE_READ); if(!f){ xSemaphoreGive(spiMutex); sendJson(500,"{\"error\":\"open\"}");return;} server.sendHeader("Access-Control-Allow-Origin","*"); server.streamFile(f,"application/octet-stream"); f.close(); xSemaphoreGive(spiMutex); }
-void hDel(){ reqCount++; if(!sdOk){sendJson(503,"{\"error\":\"no sd\"}");return;} if(!server.hasArg("path")){sendJson(400,"{\"error\":\"path\"}");return;} String p=server.arg("path"); xSemaphoreTake(spiMutex, portMAX_DELAY); bool ok=SD.remove(p); xSemaphoreGive(spiMutex); sendJson(ok?200:404, ok?"{\"ok\":true}":"{\"error\":\"del\"}"); }
+// Bearer-token gate: every /api/* call must present the per-device REST token (provisioned to the
+// phone over encrypted BLE) as `Authorization: Bearer <token>` or `?token=<token>`. Without it the
+// AP is useless to a stranger even if they somehow join. Returns true if the request may proceed.
+bool authed(){
+  String want = "Bearer " + restToken;
+  if(server.hasHeader("Authorization") && server.header("Authorization") == want) return true;
+  if(server.hasArg("token") && server.arg("token") == restToken) return true;
+  reqCount++; sendJson(401, "{\"error\":\"unauthorized\"}");
+  return false;
+}
+void hInfo(){ if(!authed()) return; reqCount++; sendJson(200, infoJson()); }
+void hFiles(){ if(!authed()) return; reqCount++; if(!sdOk){sendJson(503,"{\"error\":\"no sd\"}");return;} String p=server.hasArg("path")?server.arg("path"):"/"; xSemaphoreTake(spiMutex, portMAX_DELAY); File d=SD.open(p); if(!d||!d.isDirectory()){ if(d) d.close(); xSemaphoreGive(spiMutex); sendJson(404,"{\"error\":\"not dir\"}");return;} String j="{\"path\":\""+p+"\",\"files\":["; bool fst=true; for(File f=d.openNextFile();f;f=d.openNextFile()){ if(!fst)j+=","; fst=false; j+="{\"name\":\""+String(f.name())+"\",\"size\":"+String((uint32_t)f.size())+",\"dir\":"+(f.isDirectory()?"true":"false")+"}"; f.close(); } d.close(); xSemaphoreGive(spiMutex); j+="]}"; sendJson(200,j); }
+void hRead(){ if(!authed()) return; reqCount++; if(!sdOk){sendJson(503,"{\"error\":\"no sd\"}");return;} if(!server.hasArg("path")){sendJson(400,"{\"error\":\"path\"}");return;} String p=server.arg("path"); xSemaphoreTake(spiMutex, portMAX_DELAY); if(!SD.exists(p)){ xSemaphoreGive(spiMutex); sendJson(404,"{\"error\":\"not found\"}");return;} File f=SD.open(p,FILE_READ); if(!f){ xSemaphoreGive(spiMutex); sendJson(500,"{\"error\":\"open\"}");return;} server.sendHeader("Access-Control-Allow-Origin","*"); server.streamFile(f,"application/octet-stream"); f.close(); xSemaphoreGive(spiMutex); }
+void hDel(){ if(!authed()) return; reqCount++; if(!sdOk){sendJson(503,"{\"error\":\"no sd\"}");return;} if(!server.hasArg("path")){sendJson(400,"{\"error\":\"path\"}");return;} String p=server.arg("path"); xSemaphoreTake(spiMutex, portMAX_DELAY); bool ok=SD.remove(p); xSemaphoreGive(spiMutex); sendJson(ok?200:404, ok?"{\"ok\":true}":"{\"error\":\"del\"}"); }
 void hRoot(){ reqCount++; server.send(200,"text/plain","Vaani Link OK"); }
 
 // Streaming raw-body upload: POST /api/upload?path=/recordings/x.wav  (writes as bytes arrive; no RAM buffer)
 File uploadFile;
+bool uploadAuthed = false;
 void hUploadData(){
   HTTPUpload& up = server.upload();
   if(up.status == UPLOAD_FILE_START){
+    // Auth is checked here (headers are already parsed) so an unauthorized body never touches SD.
+    String want = "Bearer " + restToken;
+    uploadAuthed = (server.hasHeader("Authorization") && server.header("Authorization") == want) ||
+                   (server.hasArg("token") && server.arg("token") == restToken);
+    if(!uploadAuthed) return;
     String p = server.hasArg("path") ? server.arg("path") : ("/" + up.filename);
     if(sdOk){ xSemaphoreTake(spiMutex, portMAX_DELAY); if(SD.exists(p)) SD.remove(p); uploadFile = SD.open(p, FILE_WRITE); xSemaphoreGive(spiMutex); }
   } else if(up.status == UPLOAD_FILE_WRITE){
-    if(uploadFile){ xSemaphoreTake(spiMutex, portMAX_DELAY); uploadFile.write(up.buf, up.currentSize); xSemaphoreGive(spiMutex); }
+    if(uploadAuthed && uploadFile){ xSemaphoreTake(spiMutex, portMAX_DELAY); uploadFile.write(up.buf, up.currentSize); xSemaphoreGive(spiMutex); }
   } else if(up.status == UPLOAD_FILE_END){
     if(uploadFile){ xSemaphoreTake(spiMutex, portMAX_DELAY); uploadFile.close(); xSemaphoreGive(spiMutex); }
   }
 }
-void hUploadDone(){ reqCount++; sendJson(200, "{\"ok\":true}"); }
+void hUploadDone(){ reqCount++; if(!uploadAuthed){ sendJson(401,"{\"error\":\"unauthorized\"}"); return; } sendJson(200, "{\"ok\":true}"); }
 
 void setup(){
   Serial.begin(115200); delay(400);
-  Serial.println("\n=== Vaani Link v3 (WiFi + BLE + SD, hardened) ===");
+  Serial.println("\n=== Vaani Link v4 (WiFi + BLE + SD, secured) ===");
   spiMutex = xSemaphoreCreateMutex();
+  loadOrCreateCreds();                        // per-device PSK + REST token (NVS)
   pinMode(TFT_BL,OUTPUT); digitalWrite(TFT_BL,HIGH);
   spiBus.begin(SCLK,MISO_PIN,MOSI_PIN,-1);
   tft.initR(INITR_BLACKTAB); tft.setSPISpeed(20000000); tft.setRotation(1);
@@ -269,22 +319,36 @@ void setup(){
   server.on("/api/files",HTTP_GET,hFiles); server.on("/api/file",HTTP_GET,hRead);
   server.on("/api/delete",HTTP_GET,hDel);
   server.on("/api/upload",HTTP_POST,hUploadDone,hUploadData);
+  { const char* hdrs[] = {"Authorization"}; server.collectHeaders(hdrs, 1); }   // needed for Bearer auth
   server.begin();
 
   // BLE
   String bleName = String("Vaani-") + suf;
   BLEDevice::init(bleName.c_str());
   BLEDevice::setMTU(517);
+  // Security: bonding + LE encryption (Just Works — the wearable has no keyboard/display for a
+  // passkey). First connection bonds; keys persist in NVS so re-pairing is automatic. This makes
+  // the encrypted BLE link the root of trust that hands out the WiFi PSK + REST token (CRED).
+  {
+    BLESecurity* sec = new BLESecurity();
+    sec->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_BOND);   // secure-connections + bonding
+    sec->setCapability(ESP_IO_CAP_NONE);                   // Just Works (no I/O for a passkey)
+    sec->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+  }
   BLEServer* srv = BLEDevice::createServer();
   srv->setCallbacks(new SrvCb());
   BLEService* svc = srv->createService(SVC_UUID);
   chInfo = svc->createCharacteristic(INFO_UUID, BLECharacteristic::PROPERTY_READ);
+  chInfo->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
   chInfo->setValue(infoJson().c_str());
   chCmd  = svc->createCharacteristic(CMD_UUID, BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR);
+  chCmd->setAccessPermissions(ESP_GATT_PERM_WRITE_ENCRYPTED);
   chCmd->setCallbacks(new CmdCb());
   chData = svc->createCharacteristic(DATA_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+  chData->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
   chData->addDescriptor(new BLE2902());
   chStat = svc->createCharacteristic(STAT_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+  chStat->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED);
   chStat->addDescriptor(new BLE2902());
   chStat->setValue("ready");
   svc->start();
