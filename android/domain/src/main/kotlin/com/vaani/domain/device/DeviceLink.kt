@@ -89,6 +89,13 @@ interface DeviceLink {
     suspend fun deleteFile(path: String): Outcome<Unit>
 
     /**
+     * Push a compact dashboard to the wearable's screen so it's informative without the phone:
+     * whether the app is actively linked, how many notes are pending transfer, and today's top
+     * todos (already prioritised + trimmed to the first 5). Fire-and-forget; best-effort.
+     */
+    suspend fun pushDisplay(appLinked: Boolean, pendingNotes: Int, todos: List<String>): Outcome<Unit>
+
+    /**
      * Pull every recording off the wearable and feed it into the ingest pipeline
      * (transcribe → enrich → note). Emits progress per recording. Requires a
      * connected link. Idempotent: already-synced recordings dedupe by content hash.

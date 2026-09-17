@@ -90,6 +90,14 @@ File wrSession;              // active WRITE session
 bool wrOpen = false;
 uint32_t bleMtu = 20;        // conservative default payload; grows on MTU negotiate
 
+// ---- Dashboard state pushed by the app (so the wearable is informative without the phone) ----
+bool     appLinked   = false;      // app said it is actively connected/foregrounded
+int      pendingNotes = 0;         // recordings on SD not yet transferred to the app
+String   todos[5];                 // today's todos, first 5 (already prioritised app-side)
+int      todoCount   = 0;
+uint32_t lastAppMs   = 0;          // millis() of the last DISP push (staleness -> "waiting")
+volatile bool dispDirty = false;   // set by BLE-core DISP handler; loop core redraws the TFT
+
 String infoJson() {
   uint64_t sizeMB = sdOk ? SD.cardSize()/(1024ULL*1024ULL) : 0;
   uint64_t usedMB = sdOk ? SD.usedBytes()/(1024ULL*1024ULL) : 0;
@@ -106,15 +114,32 @@ String infoJson() {
 
 // ---- TFT ----
 void tftLine(int y, const String& s, uint16_t c){ tft.fillRect(0,y,tft.width(),10,ST77XX_BLACK); tft.setTextColor(c,ST77XX_BLACK); tft.setCursor(2,y); tft.print(s); }
+
+// Truncate a string to fit the 160px-wide screen (~26 chars at textSize 1).
+String fit(const String& s, int max){ return s.length() > max ? s.substring(0, max-1) + "~" : s; }
+
 void drawStatus(){
   tft.fillScreen(ST77XX_BLACK); tft.setTextSize(1);
-  tftLine(2,  "VAANI LINK", ST77XX_WHITE);
-  tftLine(16, "AP:" + apSsid, ST77XX_CYAN);
-  tftLine(28, "IP:" + apIp, ST77XX_GREEN);
-  tftLine(40, String("SD:") + (sdOk?"OK":"FAIL"), sdOk?ST77XX_GREEN:ST77XX_RED);
-  tftLine(52, String("BLE:") + (bleConnected?"CONNECTED":"advertising"), bleConnected?ST77XX_GREEN:ST77XX_YELLOW);
-  tftLine(64, "wifiClients:" + String(WiFi.softAPgetStationNum()), ST77XX_YELLOW);
-  tftLine(76, "reqs:" + String(reqCount), ST77XX_WHITE);
+  // App-connection banner: the wearable knows if the phone app is actively linked. A push older
+  // than 30s (or none yet) means the app isn't currently talking to us -> "waiting for app".
+  bool appFresh = appLinked && (millis() - lastAppMs < 30000);
+  tftLine(2, "VAANI", ST77XX_WHITE);
+  tft.setCursor(48,2); tft.setTextColor(appFresh?ST77XX_GREEN:ST77XX_YELLOW,ST77XX_BLACK);
+  tft.print(appFresh ? "APP LINKED" : (bleConnected?"CONNECTING":"WAITING APP"));
+
+  // Pending notes to transfer — the headline number the user wants at a glance.
+  uint16_t pc = pendingNotes>0 ? ST77XX_ORANGE : ST77XX_GREEN;
+  tftLine(16, String("Notes to sync: ") + String(pendingNotes), pc);
+
+  // Today's todos, first 5 (app already prioritised + trimmed).
+  tftLine(30, "TODAY", ST77XX_CYAN);
+  if(todoCount == 0){
+    tftLine(42, appFresh ? " (all clear)" : " --", ST77XX_WHITE);
+  } else {
+    for(int i=0; i<todoCount && i<5; i++){
+      tftLine(42 + i*12, fit(String(i+1) + "." + todos[i], 26), ST77XX_WHITE);
+    }
+  }
 }
 
 // ---- BLE notify helpers (opcode-framed: byte 0 = opcode, rest = payload) ----
@@ -240,6 +265,29 @@ class CmdCb : public BLECharacteristicCallbacks {
       bool ok=SD.remove(arg);
       xSemaphoreGive(spiMutex);
       notifyStr(OP_DATA, ok?"OK":"ERR"); notifyEnd();
+    }
+    else if(cmd=="DISP"){
+      // App pushes dashboard state so the wearable is informative without the phone in hand.
+      // Format: "DISP <conn> <pending>\t<todo1>\t<todo2>..."  (tab-delimited; todos already
+      // prioritised + trimmed to the first 5 app-side). Redraws the TFT immediately.
+      int t0 = arg.indexOf('\t');
+      String head = t0<0 ? arg : arg.substring(0, t0);
+      int hs = head.indexOf(' ');
+      appLinked    = (hs>0 ? head.substring(0,hs) : head).toInt() != 0;
+      pendingNotes = (hs>0 ? head.substring(hs+1) : String("0")).toInt();
+      todoCount = 0;
+      int pos = t0;
+      while(pos >= 0 && todoCount < 5){
+        int next = arg.indexOf('\t', pos+1);
+        String item = next<0 ? arg.substring(pos+1) : arg.substring(pos+1, next);
+        item.trim();
+        if(item.length()) todos[todoCount++] = item;
+        pos = next;
+      }
+      lastAppMs = millis();
+      notifyStr(OP_DATA, "OK"); notifyEnd();
+      // TFT draw must happen on the loop core (shared SPI); flag a redraw instead of drawing here.
+      dispDirty = true;
     }
     else { notifyErr("unknown cmd"); }
   }
@@ -393,12 +441,19 @@ void setup(){
 
 void loop(){
   server.handleClient();
+  // Immediate redraw when the app pushes new dashboard data (DISP), on the loop core.
+  if(dispDirty){
+    dispDirty = false;
+    xSemaphoreTake(spiMutex, portMAX_DELAY);
+    drawStatus();
+    xSemaphoreGive(spiMutex);
+  }
   static uint32_t last=0;
   if(millis()-last>3000){ last=millis();
     xSemaphoreTake(spiMutex, portMAX_DELAY);
     chInfo->setValue(infoJson().c_str());
     drawStatus();
     xSemaphoreGive(spiMutex);
-    Serial.printf("alive heap=%u wifi=%d ble=%d reqs=%u\n", ESP.getFreeHeap(), WiFi.softAPgetStationNum(), bleConnected?1:0, reqCount);
+    Serial.printf("alive heap=%u wifi=%d ble=%d reqs=%u pend=%d todos=%d\n", ESP.getFreeHeap(), WiFi.softAPgetStationNum(), bleConnected?1:0, reqCount, pendingNotes, todoCount);
   }
 }

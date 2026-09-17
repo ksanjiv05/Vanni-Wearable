@@ -215,6 +215,24 @@ class DeviceLinkImpl @Inject constructor(
         }
     }
 
+    override suspend fun pushDisplay(appLinked: Boolean, pendingNotes: Int, todos: List<String>): Outcome<Unit> =
+        withContext(Dispatchers.IO) {
+            // Firmware DISP format: "DISP <conn> <pending>\t<todo1>\t<todo2>..." (tab-delimited).
+            // Sanitise: strip tabs/newlines from todos and cap at 5 × ~26 chars so the payload
+            // stays within a BLE write and the wearable's screen width.
+            val safeTodos = todos.take(5).map { it.replace('\t', ' ').replace('\n', ' ').trim().take(26) }
+            val head = "DISP ${if (appLinked) 1 else 0} $pendingNotes"
+            val payload = if (safeTodos.isEmpty()) head else head + "\t" + safeTodos.joinToString("\t")
+            when (active) {
+                LinkTransport.BLE, LinkTransport.WIFI -> {
+                    // DISP is a BLE control command (small, over the encrypted CMD char). Best-effort.
+                    val ok = runCatching { ble.command(payload) != null }.getOrDefault(false)
+                    if (ok) Outcome.Ok(Unit) else Outcome.Err(AppError.Network("display push failed"))
+                }
+                null -> Outcome.Err(AppError.Network("Not connected"))
+            }
+        }
+
     override fun syncRecordings(deleteAfterSync: Boolean): Flow<com.vaani.domain.device.SyncProgress> =
         syncManager.sync(this, deleteAfterSync)
 

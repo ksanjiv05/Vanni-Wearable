@@ -15,6 +15,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -38,6 +39,7 @@ data class DeviceUiState(
 @HiltViewModel
 class DeviceViewModel @Inject constructor(
     private val link: DeviceLink,
+    private val notes: com.vaani.domain.repository.NotesRepository,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(DeviceUiState())
@@ -83,8 +85,36 @@ class DeviceViewModel @Inject constructor(
                     deviceName = device.name, message = "Connected")
                 is Outcome.Err -> _ui.value = _ui.value.copy(busy = false, message = errText(r))
             }
-            if (_ui.value.state == LinkState.CONNECTED) refreshFiles()
+            if (_ui.value.state == LinkState.CONNECTED) {
+                refreshFiles()
+                pushDashboard()
+            }
         }
+    }
+
+    /**
+     * Push a glanceable dashboard to the wearable's screen: app-linked flag, count of recordings
+     * still pending transfer, and today's top todos (first 5). Called after connect and after sync
+     * so the wearable stays informative even when the phone isn't in hand.
+     */
+    private fun pushDashboard() {
+        viewModelScope.launch {
+            val (pending, todos) = gatherDashboard()
+            runCatching { link.pushDisplay(appLinked = true, pendingNotes = pending, todos = todos) }
+        }
+    }
+
+    /** pending = recordings imported but not yet READY; todos = today's open items, HIGH priority first. */
+    private suspend fun gatherDashboard(): Pair<Int, List<String>> {
+        val noteList = runCatching { notes.observeNotes().first() }.getOrDefault(emptyList())
+        val pending = runCatching { notes.observeProcessing().first().size }.getOrDefault(0)
+        val openTodos = noteList
+            .flatMap { it.todos }
+            .filter { it.status == com.vaani.domain.model.TodoStatus.OPEN }
+            .sortedByDescending { it.priority.ordinal }   // HIGH → MEDIUM → LOW
+            .take(5)
+            .map { t -> t.dueHint?.let { "${t.text} (${it})" } ?: t.text }
+        return pending to openTodos
     }
 
     fun disconnect() {
@@ -166,6 +196,7 @@ class DeviceViewModel @Inject constructor(
                 _ui.value = _ui.value.copy(syncStatus = line, syncing = !done)
             }
             refreshFiles()
+            pushDashboard()   // pending count + todos changed after a sync
         }
     }
 
