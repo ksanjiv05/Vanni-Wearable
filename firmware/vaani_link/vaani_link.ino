@@ -118,6 +118,24 @@ void tftLine(int y, const String& s, uint16_t c){ tft.fillRect(0,y,tft.width(),1
 // Truncate a string to fit the 160px-wide screen (~26 chars at textSize 1).
 String fit(const String& s, int max){ return s.length() > max ? s.substring(0, max-1) + "~" : s; }
 
+// Render a todo starting at row y, wrapping onto a 2nd line if it's a bit long. Line 2 is indented
+// under the text (past the "N." prefix). Returns the number of 12px rows used (1 or 2).
+int drawTodo(int idx, const String& text, int y, uint16_t c){
+  const int W = 26;                      // chars that fit on one 160px line at textSize 1
+  String prefix = String(idx) + ".";
+  String full = prefix + text;
+  if(full.length() <= W){ tftLine(y, full, c); return 1; }
+  // Break line 1 on the last space that fits (fall back to a hard cut).
+  int cut = full.lastIndexOf(' ', W);
+  if(cut < prefix.length()) cut = W;     // no usable space -> hard wrap
+  tftLine(y, full.substring(0, cut), c);
+  String rest = full.substring(cut);
+  rest.trim();
+  // Indent line 2 under the text and truncate if still too long.
+  tftLine(y + 12, "  " + fit(rest, W - 2), c);
+  return 2;
+}
+
 void drawStatus(){
   tft.fillScreen(ST77XX_BLACK); tft.setTextSize(1);
   // App-connection banner: the wearable knows if the phone app is actively linked. A push older
@@ -131,13 +149,15 @@ void drawStatus(){
   uint16_t pc = pendingNotes>0 ? ST77XX_ORANGE : ST77XX_GREEN;
   tftLine(16, String("Notes to sync: ") + String(pendingNotes), pc);
 
-  // Today's todos, first 5 (app already prioritised + trimmed).
+  // Today's todos — each may wrap to 2 lines; render as many as fit (screen is 128px tall).
   tftLine(30, "TODAY", ST77XX_CYAN);
   if(todoCount == 0){
     tftLine(42, appFresh ? " (all clear)" : " --", ST77XX_WHITE);
   } else {
+    int y = 42;
     for(int i=0; i<todoCount && i<5; i++){
-      tftLine(42 + i*12, fit(String(i+1) + "." + todos[i], 26), ST77XX_WHITE);
+      if(y + 12 > tft.height()) break;                 // out of vertical space
+      y += drawTodo(i+1, todos[i], y, ST77XX_WHITE) * 12;
     }
   }
 }

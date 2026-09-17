@@ -218,9 +218,9 @@ class DeviceLinkImpl @Inject constructor(
     override suspend fun pushDisplay(appLinked: Boolean, pendingNotes: Int, todos: List<String>): Outcome<Unit> =
         withContext(Dispatchers.IO) {
             // Firmware DISP format: "DISP <conn> <pending>\t<todo1>\t<todo2>..." (tab-delimited).
-            // Sanitise: strip tabs/newlines from todos and cap at 5 × ~26 chars so the payload
-            // stays within a BLE write and the wearable's screen width.
-            val safeTodos = todos.take(5).map { it.replace('\t', ' ').replace('\n', ' ').trim().take(26) }
+            // Sanitise: strip tabs/newlines from todos and cap at ~48 chars (the wearable wraps a
+            // long todo onto a 2nd line) so the payload stays within a BLE write.
+            val safeTodos = todos.take(5).map { it.replace('\t', ' ').replace('\n', ' ').trim().take(48) }
             val head = "DISP ${if (appLinked) 1 else 0} $pendingNotes"
             val payload = if (safeTodos.isEmpty()) head else head + "\t" + safeTodos.joinToString("\t")
             when (active) {
