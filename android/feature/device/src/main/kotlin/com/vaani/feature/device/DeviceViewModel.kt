@@ -46,6 +46,7 @@ class DeviceViewModel @Inject constructor(
     val ui: StateFlow<DeviceUiState> = _ui.asStateFlow()
 
     private var scanJob: Job? = null
+    private var heartbeatJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -87,16 +88,29 @@ class DeviceViewModel @Inject constructor(
             }
             if (_ui.value.state == LinkState.CONNECTED) {
                 refreshFiles()
-                pushDashboard()
+                startDashboardHeartbeat()
             }
         }
     }
 
     /**
      * Push a glanceable dashboard to the wearable's screen: app-linked flag, count of recordings
-     * still pending transfer, and today's top todos (first 5). Called after connect and after sync
-     * so the wearable stays informative even when the phone isn't in hand.
+     * still pending transfer, and today's top todos (first 5). Runs as a heartbeat every 15s while
+     * connected so the wearable's "APP LINKED" banner stays fresh (firmware marks it stale >30s)
+     * and the counts/todos stay current. Cancelled on disconnect.
      */
+    private fun startDashboardHeartbeat() {
+        heartbeatJob?.cancel()
+        heartbeatJob = viewModelScope.launch {
+            while (true) {
+                val (pending, todos) = gatherDashboard()
+                runCatching { link.pushDisplay(appLinked = true, pendingNotes = pending, todos = todos) }
+                kotlinx.coroutines.delay(15_000)
+            }
+        }
+    }
+
+    /** One-off push (e.g. right after a sync changes the counts). */
     private fun pushDashboard() {
         viewModelScope.launch {
             val (pending, todos) = gatherDashboard()
@@ -118,6 +132,7 @@ class DeviceViewModel @Inject constructor(
     }
 
     fun disconnect() {
+        heartbeatJob?.cancel()
         viewModelScope.launch {
             link.disconnect()
             _ui.value = _ui.value.copy(files = emptyList(), info = null, lastResult = null)
