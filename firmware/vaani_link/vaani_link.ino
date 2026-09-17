@@ -118,13 +118,14 @@ void tftLine(int y, const String& s, uint16_t c){ tft.fillRect(0,y,tft.width(),1
 // Truncate a string to fit the 160px-wide screen (~26 chars at textSize 1).
 String fit(const String& s, int max){ return s.length() > max ? s.substring(0, max-1) + "~" : s; }
 
-// Render a todo starting at row y, wrapping onto a 2nd line if it's a bit long. Line 2 is indented
-// under the text (past the "N." prefix). Returns the number of 12px rows used (1 or 2).
-int drawTodo(int idx, const String& text, int y, uint16_t c){
+// Render a todo starting at row y. [allowWrap] true (first 2 todos) lets a long todo spill onto an
+// indented 2nd line; otherwise it's a one-liner truncated with "~". Returns rows used (1 or 2).
+int drawTodo(int idx, const String& text, int y, uint16_t c, bool allowWrap){
   const int W = 26;                      // chars that fit on one 160px line at textSize 1
   String prefix = String(idx) + ".";
   String full = prefix + text;
   if(full.length() <= W){ tftLine(y, full, c); return 1; }
+  if(!allowWrap){ tftLine(y, fit(full, W), c); return 1; }   // one-liner: truncate
   // Break line 1 on the last space that fits (fall back to a hard cut).
   int cut = full.lastIndexOf(' ', W);
   if(cut < prefix.length()) cut = W;     // no usable space -> hard wrap
@@ -157,7 +158,7 @@ void drawStatus(){
     int y = 42;
     for(int i=0; i<todoCount && i<5; i++){
       if(y + 12 > tft.height()) break;                 // out of vertical space
-      y += drawTodo(i+1, todos[i], y, ST77XX_WHITE) * 12;
+      y += drawTodo(i+1, todos[i], y, ST77XX_WHITE, i < 2) * 12;   // first 2 may wrap to 2 lines
     }
   }
 }
