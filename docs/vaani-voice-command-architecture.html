@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vaani Link — Voice Command Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#020617; --panel:#0b1120; --card:#0f172a; --grid:#1e293b;
+    --cyan:#22d3ee; --emerald:#34d399; --violet:#a78bfa; --amber:#fbbf24;
+    --rose:#fb7185; --orange:#fb923c; --slate:#94a3b8; --ink:#e2e8f0; --muted:#64748b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:'JetBrains Mono',monospace;
+    padding:32px 20px 60px;line-height:1.55}
+  .wrap{max-width:1180px;margin:0 auto}
+  header{margin-bottom:28px}
+  .title{display:flex;align-items:center;gap:12px;font-size:26px;font-weight:700;letter-spacing:-.5px}
+  .dot{width:12px;height:12px;border-radius:50%;background:var(--emerald);
+    box-shadow:0 0 0 0 rgba(52,211,153,.7);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(52,211,153,.6)}70%{box-shadow:0 0 0 12px rgba(52,211,153,0)}100%{box-shadow:0 0 0 0 rgba(52,211,153,0)}}
+  .sub{color:var(--muted);font-size:13px;margin-top:6px;margin-left:24px}
+  h2{font-size:16px;font-weight:700;margin:38px 0 14px;color:#fff;
+    display:flex;align-items:center;gap:9px}
+  h2 .bar{width:4px;height:18px;border-radius:2px;background:var(--cyan)}
+  .panel{background:var(--panel);border:1px solid var(--grid);border-radius:14px;
+    padding:20px;overflow-x:auto}
+  p.lead{color:var(--slate);font-size:13px;margin:0 0 14px}
+  svg{display:block;margin:0 auto;max-width:100%;height:auto}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--grid);vertical-align:top}
+  th{color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  td .tag{font-weight:700}
+  .win{color:var(--emerald)} .mid{color:var(--amber)} .bad{color:var(--rose)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px}
+  .card{background:var(--card);border:1px solid var(--grid);border-radius:12px;padding:16px}
+  .card-h{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-weight:700;font-size:13px}
+  .cdot{width:9px;height:9px;border-radius:50%}
+  .card ul{list-style:none;font-size:12px;color:var(--slate)}
+  .card li{margin:5px 0}
+  code{background:#1e293b;padding:1px 6px;border-radius:4px;color:var(--amber);font-size:12px}
+  .pinrow code{color:var(--cyan)}
+  .note{border-left:3px solid var(--amber);background:rgba(120,53,15,.15);
+    padding:12px 16px;border-radius:0 8px 8px 0;font-size:12.5px;color:#fde68a;margin-top:14px}
+  .note.rose{border-color:var(--rose);background:rgba(136,19,55,.18);color:#fecdd3}
+  .note.cyan{border-color:var(--cyan);background:rgba(8,51,68,.28);color:#a5f3fc}
+  footer{margin-top:44px;color:var(--muted);font-size:11px;text-align:center}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:11px;color:var(--slate)}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .sw{width:14px;height:10px;border-radius:3px;border-width:1.5px;border-style:solid}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="title"><span class="dot"></span>Vaani Link — On-Device Voice Command Architecture</div>
+    <div class="sub">ESP32-S3 N16R8 · offline wake-word + speech commands · ESP-SR (WakeNet + MultiNet) · INMP441 mic + MAX98357A speaker</div>
+  </header>
+
+  <!-- ============ WHY ESP-SR ============ -->
+  <h2><span class="bar"></span>1 · Library choice — why ESP-SR</h2>
+  <p class="lead">Goal: a "Hey Vaani"-style always-listening assistant that runs <b>fully on the wearable, offline, no cloud</b>.
+  I evaluated the three viable options for the ESP32-S3. ESP-SR wins decisively because your exact chip (the N16R8)
+  is the hardware Espressif built the framework for.</p>
+  <div class="panel">
+    <table>
+      <thead><tr>
+        <th>Option</th><th>What it is</th><th>Offline?</th><th>Custom commands</th><th>Fit for N16R8</th><th>Verdict</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td><b class="win">ESP-SR</b><br><span style="color:var(--muted);font-size:11px">Espressif official</span></td>
+          <td>WakeNet (wake word) + MultiNet (up to ~200 commands) + AFE (noise/VAD). Neural nets tuned for the S3.</td>
+          <td><b class="win">Yes</b> · 100% on-device</td>
+          <td><b class="win">~200 phrases</b>, editable at runtime (MultiNet6+)</td>
+          <td><b class="win">Ideal</b> — needs 16MB flash + 8MB PSRAM = exactly N16R8</td>
+          <td><b class="win">CHOSEN ✓</b></td>
+        </tr>
+        <tr>
+          <td><b class="mid">Edge Impulse</b></td>
+          <td>Train your own keyword-spotting model, export an Arduino library.</td>
+          <td><b class="win">Yes</b></td>
+          <td><b class="mid">Few keywords</b>; you must record/label training audio</td>
+          <td><b class="mid">Works</b>, lighter, but you own the ML pipeline</td>
+          <td>Backup / niche words</td>
+        </tr>
+        <tr>
+          <td><b class="bad">TFLite Micro<br>micro_speech</b></td>
+          <td>Google's tiny "yes/no" keyword demo on TFLite for Microcontrollers.</td>
+          <td><b class="win">Yes</b></td>
+          <td><b class="bad">2–4 words</b>, low accuracy</td>
+          <td>Runs anywhere but too limited</td>
+          <td>Not suitable</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="note cyan"><b>Why ESP-SR is the right call for Vaani:</b> it is the only option that gives a real "Siri/Alexa" experience
+    — a low-power neural <b>wake word</b> always listening, then a <b>multi-command</b> recognizer — entirely offline, and it was
+    engineered specifically for the ESP32-S3's PSRAM + vector instructions. Your N16R8 already meets its hard requirements, so
+    there's no hardware upgrade needed — only a microphone (and optionally a speaker for audio feedback).</div>
+  </div>
+
+  <!-- ============ ARCHITECTURE / SIGNAL FLOW ============ -->
+  <h2><span class="bar"></span>2 · Signal-flow architecture</h2>
+  <p class="lead">Audio flows left→right through the ESP-SR pipeline, then a dispatcher maps recognized commands onto Vaani Link's
+  existing subsystems (SD recording, BLE/Wi-Fi sync, TFT feedback, speaker chime).</p>
+  <div class="panel">
+    <svg viewBox="0 0 1120 470" font-family="'JetBrains Mono',monospace">
+      <defs>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+        </pattern>
+        <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#64748b"/>
+        </marker>
+        <marker id="arrE" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+          <path d="M0,0 L7,3 L0,6 Z" fill="#34d399"/>
+        </marker>
+      </defs>
+      <rect width="1120" height="470" fill="url(#grid)"/>
+
+      <!-- flow arrows (drawn early, behind boxes) -->
+      <g stroke="#64748b" stroke-width="1.6" fill="none" marker-end="url(#arr)">
+        <line x1="150" y1="80" x2="196" y2="80"/>
+        <line x1="330" y1="80" x2="376" y2="80"/>
+        <line x1="510" y1="80" x2="556" y2="80"/>
+        <line x1="690" y1="80" x2="736" y2="80"/>
+        <line x1="870" y1="80" x2="916" y2="80"/>
+      </g>
+      <!-- dispatcher fan-out -->
+      <g stroke="#34d399" stroke-width="1.6" fill="none" marker-end="url(#arrE)">
+        <path d="M 993 118 C 993 175, 250 165, 250 212"/>
+        <path d="M 993 118 C 993 175, 490 175, 490 212"/>
+        <path d="M 993 118 C 993 185, 730 185, 730 212"/>
+        <path d="M 993 118 C 993 175, 968 175, 968 212"/>
+      </g>
+
+      <!-- helper: opaque bg then styled rect -->
+      <!-- MIC -->
+      <g>
+        <rect x="30" y="52" width="120" height="56" rx="6" fill="#0f172a"/>
+        <rect x="30" y="52" width="120" height="56" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="90" y="76" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">INMP441</text>
+        <text x="90" y="92" fill="#94a3b8" font-size="8" text-anchor="middle">I2S MEMS mic · 16kHz</text>
+      </g>
+      <!-- I2S RX -->
+      <g>
+        <rect x="196" y="52" width="134" height="56" rx="6" fill="#0f172a"/>
+        <rect x="196" y="52" width="134" height="56" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="263" y="76" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">I2S RX driver</text>
+        <text x="263" y="92" fill="#22d3ee" font-size="8" text-anchor="middle">mono 16-bit PCM</text>
+      </g>
+      <!-- AFE -->
+      <g>
+        <rect x="376" y="52" width="134" height="56" rx="6" fill="#0f172a"/>
+        <rect x="376" y="52" width="134" height="56" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="443" y="72" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">AFE</text>
+        <text x="443" y="87" fill="#34d399" font-size="8" text-anchor="middle">noise supp · AGC</text>
+        <text x="443" y="98" fill="#34d399" font-size="8" text-anchor="middle">VAD (voice detect)</text>
+      </g>
+      <!-- WakeNet -->
+      <g>
+        <rect x="556" y="52" width="134" height="56" rx="6" fill="#0f172a"/>
+        <rect x="556" y="52" width="134" height="56" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="623" y="72" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">WakeNet</text>
+        <text x="623" y="87" fill="#a78bfa" font-size="8" text-anchor="middle">wake word engine</text>
+        <text x="623" y="98" fill="#a78bfa" font-size="8" text-anchor="middle">"Hi ESP" / custom</text>
+      </g>
+      <!-- MultiNet -->
+      <g>
+        <rect x="736" y="52" width="134" height="56" rx="6" fill="#0f172a"/>
+        <rect x="736" y="52" width="134" height="56" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="803" y="72" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">MultiNet</text>
+        <text x="803" y="87" fill="#a78bfa" font-size="8" text-anchor="middle">command recogniser</text>
+        <text x="803" y="98" fill="#a78bfa" font-size="8" text-anchor="middle">~200 phrases</text>
+      </g>
+      <!-- Dispatcher -->
+      <g>
+        <rect x="916" y="52" width="154" height="66" rx="6" fill="#0f172a"/>
+        <rect x="916" y="52" width="154" height="66" rx="6" fill="rgba(251,146,60,0.3)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="993" y="78" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">Command</text>
+        <text x="993" y="93" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">Dispatcher</text>
+        <text x="993" y="108" fill="#fb923c" font-size="8" text-anchor="middle">maps intent → action</text>
+      </g>
+
+      <!-- Action row (existing Vaani subsystems) -->
+      <g>
+        <rect x="180" y="212" width="140" height="60" rx="6" fill="#0f172a"/>
+        <rect x="180" y="212" width="140" height="60" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="250" y="238" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">Record → SD</text>
+        <text x="250" y="254" fill="#34d399" font-size="8" text-anchor="middle">/vaani/*.wav</text>
+      </g>
+      <g>
+        <rect x="420" y="212" width="140" height="60" rx="6" fill="#0f172a"/>
+        <rect x="420" y="212" width="140" height="60" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="490" y="238" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">Sync</text>
+        <text x="490" y="254" fill="#22d3ee" font-size="8" text-anchor="middle">BLE / Wi-Fi → app</text>
+      </g>
+      <g>
+        <rect x="660" y="212" width="140" height="60" rx="6" fill="#0f172a"/>
+        <rect x="660" y="212" width="140" height="60" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="730" y="238" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">TFT feedback</text>
+        <text x="730" y="254" fill="#a78bfa" font-size="8" text-anchor="middle">"Listening…" / status</text>
+      </g>
+      <g>
+        <rect x="898" y="212" width="140" height="60" rx="6" fill="#0f172a"/>
+        <rect x="898" y="212" width="140" height="60" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="968" y="238" fill="#e2e8f0" font-size="12" font-weight="700" text-anchor="middle">Speaker chime</text>
+        <text x="968" y="254" fill="#fbbf24" font-size="8" text-anchor="middle">MAX98357A · beep/TTS</text>
+      </g>
+
+      <!-- stage band labels -->
+      <text x="90"  y="138" fill="#64748b" font-size="8" text-anchor="middle">HARDWARE</text>
+      <text x="443" y="138" fill="#64748b" font-size="8" text-anchor="middle">— ESP-SR pipeline (PSRAM, Core 1) —</text>
+      <text x="803" y="138" fill="#64748b" font-size="8" text-anchor="middle"></text>
+      <text x="609" y="300" fill="#64748b" font-size="8" text-anchor="middle">— EXISTING VAANI LINK SUBSYSTEMS (reused, unchanged) —</text>
+
+      <!-- PSRAM boundary around AFE/WakeNet/MultiNet -->
+      <rect x="366" y="38" width="514" height="84" rx="12" fill="none" stroke="#a78bfa" stroke-width="1" stroke-dasharray="8,4" opacity="0.5"/>
+    </svg>
+    <div class="legend">
+      <span><span class="sw" style="background:rgba(30,41,59,.5);border-color:#94a3b8"></span>Hardware</span>
+      <span><span class="sw" style="background:rgba(8,51,68,.4);border-color:#22d3ee"></span>I2S / transport</span>
+      <span><span class="sw" style="background:rgba(6,78,59,.4);border-color:#34d399"></span>DSP / capture</span>
+      <span><span class="sw" style="background:rgba(76,29,149,.4);border-color:#a78bfa"></span>Neural net (PSRAM)</span>
+      <span><span class="sw" style="background:rgba(251,146,60,.3);border-color:#fb923c"></span>Dispatcher</span>
+      <span><span class="sw" style="background:rgba(120,53,15,.3);border-color:#fbbf24"></span>Audio out</span>
+    </div>
+  </div>
+
+  <!-- ============ WIRING ============ -->
+  <h2><span class="bar"></span>3 · Wiring — INMP441 mic + MAX98357A speaker</h2>
+  <p class="lead">The ESP32-S3 has <b>two I2S peripherals</b>, so the mic (I2S-0 RX) and the amplifier/speaker (I2S-1 TX) run on
+  independent buses — no sharing conflicts. All pins below are chosen to <b>avoid the TFT + SD pins already in use</b> and the
+  N16R8's reserved octal-PSRAM pins (GPIO 33–37).</p>
+  <div class="panel">
+    <svg viewBox="0 0 1120 430" font-family="'JetBrains Mono',monospace">
+      <defs>
+        <pattern id="grid2" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+        </pattern>
+        <marker id="d" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8"/></marker>
+      </defs>
+      <rect width="1120" height="430" fill="url(#grid2)"/>
+
+      <!-- ESP32-S3 center -->
+      <rect x="430" y="70" width="260" height="290" rx="10" fill="#0f172a"/>
+      <rect x="430" y="70" width="260" height="290" rx="10" fill="rgba(6,78,59,0.25)" stroke="#34d399" stroke-width="2"/>
+      <text x="560" y="100" fill="#fff" font-size="15" font-weight="700" text-anchor="middle">ESP32-S3</text>
+      <text x="560" y="118" fill="#34d399" font-size="9" text-anchor="middle">N16R8 · 16MB flash · 8MB PSRAM</text>
+      <line x1="450" y1="130" x2="670" y2="130" stroke="#1e293b" stroke-width="1"/>
+      <!-- left pin labels (mic) -->
+      <g font-size="10" fill="#22d3ee" text-anchor="start">
+        <text x="442" y="158">GPIO4  · I2S0 SCK</text>
+        <text x="442" y="180">GPIO5  · I2S0 WS</text>
+        <text x="442" y="202">GPIO6  · I2S0 SD(in)</text>
+      </g>
+      <!-- right pin labels (speaker) -->
+      <g font-size="10" fill="#fbbf24" text-anchor="end">
+        <text x="678" y="158">I2S1 BCLK · GPIO7</text>
+        <text x="678" y="180">I2S1 LRC  · GPIO15</text>
+        <text x="678" y="202">I2S1 DIN  · GPIO16</text>
+      </g>
+      <!-- power rails -->
+      <g font-size="10" fill="#fb7185" text-anchor="middle">
+        <text x="500" y="238">3V3</text><text x="560" y="238">5V</text><text x="620" y="238">GND</text>
+      </g>
+      <text x="560" y="300" fill="#64748b" font-size="8.5" text-anchor="middle">In use elsewhere:</text>
+      <text x="560" y="314" fill="#64748b" font-size="8" text-anchor="middle">TFT 10/17/18/12/11/21 · SD 14/13</text>
+      <text x="560" y="332" fill="#64748b" font-size="8" text-anchor="middle">Reserved (PSRAM): 33–37</text>
+
+      <!-- INMP441 (left) -->
+      <rect x="60" y="120" width="180" height="150" rx="8" fill="#0f172a"/>
+      <rect x="60" y="120" width="180" height="150" rx="8" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+      <text x="150" y="145" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">INMP441</text>
+      <text x="150" y="160" fill="#94a3b8" font-size="8" text-anchor="middle">I2S MEMS microphone</text>
+      <g font-size="10" fill="#e2e8f0" text-anchor="start">
+        <text x="76" y="184">SCK</text><text x="76" y="204">WS</text><text x="76" y="224">SD</text>
+        <text x="76" y="244">L/R → GND</text><text x="150" y="244">VDD 3V3</text><text x="150" y="184">GND</text>
+      </g>
+      <!-- mic wires -->
+      <g stroke="#22d3ee" stroke-width="1.6" fill="none" marker-end="url(#d)">
+        <path d="M 240 180 C 340 180, 360 154, 438 154"/>
+        <path d="M 240 200 C 330 200, 360 176, 438 176"/>
+        <path d="M 240 220 C 320 220, 360 198, 438 198"/>
+      </g>
+
+      <!-- MAX98357A (right) -->
+      <rect x="880" y="120" width="180" height="150" rx="8" fill="#0f172a"/>
+      <rect x="880" y="120" width="180" height="150" rx="8" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+      <text x="970" y="145" fill="#fff" font-size="13" font-weight="700" text-anchor="middle">MAX98357A</text>
+      <text x="970" y="160" fill="#fbbf24" font-size="8" text-anchor="middle">I2S class-D amp + speaker</text>
+      <g font-size="10" fill="#e2e8f0" text-anchor="end">
+        <text x="1044" y="184">BCLK</text><text x="1044" y="204">LRC</text><text x="1044" y="224">DIN</text>
+        <text x="1044" y="244">VIN 5V · GND</text>
+      </g>
+      <!-- speaker wires -->
+      <g stroke="#fbbf24" stroke-width="1.6" fill="none" marker-end="url(#d)">
+        <path d="M 880 184 C 780 184, 760 154, 682 154"/>
+        <path d="M 880 204 C 790 204, 760 176, 682 176"/>
+        <path d="M 880 224 C 800 224, 760 198, 682 198"/>
+      </g>
+      <!-- little speaker glyph -->
+      <path d="M 970 285 l 18 -12 v 40 l -18 -12 h -14 v -16 z" fill="none" stroke="#fbbf24" stroke-width="1.4"/>
+      <path d="M 992 282 a 14 14 0 0 1 0 30" fill="none" stroke="#fbbf24" stroke-width="1.2"/>
+      <text x="970" y="335" fill="#fbbf24" font-size="8" text-anchor="middle">4–8Ω speaker</text>
+    </svg>
+
+    <table style="margin-top:8px">
+      <thead><tr><th>Module</th><th>Module pin</th><th>ESP32-S3 GPIO</th><th>Notes</th></tr></thead>
+      <tbody class="pinrow">
+        <tr><td rowspan="6"><b>INMP441</b><br><span style="color:var(--muted);font-size:11px">mic — I2S0 RX</span></td>
+            <td>SCK</td><td><code>GPIO4</code></td><td>bit clock (BCLK)</td></tr>
+        <tr><td>WS</td><td><code>GPIO5</code></td><td>word select (LRCL)</td></tr>
+        <tr><td>SD</td><td><code>GPIO6</code></td><td>serial data → ESP (mic out)</td></tr>
+        <tr><td>L/R</td><td><code>GND</code></td><td>ties channel to LEFT (required)</td></tr>
+        <tr><td>VDD</td><td><code>3V3</code></td><td>do <b>not</b> use 5V</td></tr>
+        <tr><td>GND</td><td><code>GND</code></td><td>common ground</td></tr>
+        <tr><td rowspan="5"><b>MAX98357A</b><br><span style="color:var(--muted);font-size:11px">amp+spk — I2S1 TX</span></td>
+            <td>BCLK</td><td><code>GPIO7</code></td><td>bit clock</td></tr>
+        <tr><td>LRC</td><td><code>GPIO15</code></td><td>word select</td></tr>
+        <tr><td>DIN</td><td><code>GPIO16</code></td><td>data ESP → amp</td></tr>
+        <tr><td>VIN</td><td><code>5V</code></td><td>louder on 5V; GAIN/SD may float</td></tr>
+        <tr><td>GND</td><td><code>GND</code></td><td>common ground</td></tr>
+      </tbody>
+    </table>
+    <div class="note rose"><b>Pin-conflict check (done):</b> GPIO 4, 5, 6, 7, 15, 16 are all free — they don't touch the TFT
+    (10/17/18/12/11/21), the SD card (14/13), the native-USB pins (19/20), or the N16R8's octal-PSRAM pins (33–37). Safe to add
+    without disturbing anything already verified.</div>
+    <div class="note">The speaker is <b>optional</b> — it only gives audio feedback (a "ding" when the wake word is heard, or spoken
+    replies). If you skip it, wake-word + commands still work fully; the TFT already shows "Listening…" as visual feedback.</div>
+  </div>
+
+  <!-- ============ COMMAND SET ============ -->
+  <h2><span class="bar"></span>4 · Proposed command set (wake word + Vaani actions)</h2>
+  <div class="panel">
+    <table>
+      <thead><tr><th>Spoken</th><th>Type</th><th>Action on the wearable</th></tr></thead>
+      <tbody>
+        <tr><td><code>"Hi Vaani"</code> <span style="color:var(--muted);font-size:11px">(wake word)</span></td><td>WakeNet</td><td>Wakes the recogniser · TFT shows "Listening…" · optional chime</td></tr>
+        <tr><td><code>"Start recording"</code></td><td>MultiNet</td><td>Begin capturing mic audio → <code>/vaani/rec-*.wav</code> on SD</td></tr>
+        <tr><td><code>"Stop recording"</code></td><td>MultiNet</td><td>Close the WAV file, update pending count</td></tr>
+        <tr><td><code>"Sync notes"</code></td><td>MultiNet</td><td>Trigger BLE/Wi-Fi transfer of pending recordings to the app</td></tr>
+        <tr><td><code>"How many pending"</code></td><td>MultiNet</td><td>Show/announce the pending-transfer count</td></tr>
+        <tr><td><code>"Delete last"</code></td><td>MultiNet</td><td>Remove the most recent recording (with on-screen confirm)</td></tr>
+      </tbody>
+    </table>
+    <div class="note cyan">Wake word note: WakeNet ships a set of prebuilt words ("Hi ESP", "Alexa", "Hi Lexin", etc.). A truly
+    custom <b>"Hi Vaani"</b> requires a model trained by Espressif's service — so for v1 we'd pick the closest prebuilt wake word,
+    and the 5 commands above are fully custom via MultiNet (that part is free-form English).</div>
+  </div>
+
+  <!-- ============ CONSTRAINTS / BUILD PATH ============ -->
+  <h2><span class="bar"></span>5 · Constraints &amp; build path (read before we start)</h2>
+  <div class="cards">
+    <div class="card">
+      <div class="card-h"><span class="cdot" style="background:var(--rose)"></span>Flash / partition</div>
+      <ul>
+        <li>Current firmware is at <b>95% of the default partition</b>.</li>
+        <li>ESP-SR models need a dedicated <code>model</code> partition (several MB).</li>
+        <li>→ Requires a <b>custom partition table</b> (16MB gives plenty of room) or a separate "voice" firmware image.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-h"><span class="cdot" style="background:var(--amber)"></span>Framework</div>
+      <ul>
+        <li>ESP-SR is officially <b>ESP-IDF</b>.</li>
+        <li>arduino-esp32 3.x ships an <code>ESP_SR</code> wrapper, but it's stricter than our current Arduino flow.</li>
+        <li>→ Likely move the voice build to <b>ESP-IDF</b> (or IDF-as-component in Arduino).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-h"><span class="cdot" style="background:var(--emerald)"></span>Compute / memory</div>
+      <ul>
+        <li>WakeNet + MultiNet + AFE run in <b>PSRAM on Core 1</b>.</li>
+        <li>N16R8's 8MB PSRAM is sufficient; leaves headroom for SD + BLE.</li>
+        <li>Continuous listening draws more power — fine while worn/charged.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-h"><span class="cdot" style="background:var(--cyan)"></span>Suggested phasing</div>
+      <ul>
+        <li><b>P1</b> Mic + I2S capture test (raw audio to serial/SD).</li>
+        <li><b>P2</b> WakeNet wake word → TFT "Listening…".</li>
+        <li><b>P3</b> MultiNet 5 commands → dispatcher → SD/sync.</li>
+        <li><b>P4</b> (opt) MAX98357A chime / spoken feedback.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    Vaani Link · voice-command design doc · ESP-SR (WakeNet + MultiNet + AFE) on ESP32-S3 N16R8 · offline / on-device
+  </footer>
+</div>
+</body>
+</html>
