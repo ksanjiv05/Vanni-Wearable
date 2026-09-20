@@ -65,6 +65,7 @@ class IngestPipelineTest {
             log.recordingPipeline += recordingId to state
         }
         override suspend fun setTodoStatus(todoId: String, status: com.vaani.domain.model.TodoStatus, completedAtEpochMs: Long?) {}
+        override suspend fun deleteRecording(recordingId: String): String? = null
     }
 
     private class OkAsr : AsrEngine {

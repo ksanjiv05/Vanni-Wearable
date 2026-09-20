@@ -1,6 +1,7 @@
 package com.vaani.feature.library
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +57,7 @@ fun LibraryScreen(
         onDeviceClick = onDeviceClick,
         onChatClick = onChatClick,
         onRetry = viewModel::retry,
+        onDelete = viewModel::delete,
         modifier = modifier,
     )
 }
@@ -64,9 +69,12 @@ internal fun LibraryContent(
     onDeviceClick: () -> Unit = {},
     onChatClick: () -> Unit = {},
     onRetry: (String) -> Unit = {},
+    onDelete: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val colors = VaaniTheme.colors
+    // Recording id pending a delete confirmation (null = no dialog).
+    var confirmDelete by remember { mutableStateOf<String?>(null) }
     Column(modifier.fillMaxSize().background(colors.background)) {
         VaaniTopBar(
             title = "Library",
@@ -101,14 +109,22 @@ internal fun LibraryContent(
             if (state.processing.isNotEmpty()) {
                 item { DayGroupHeader("PROCESSING") }
                 items(state.processing, key = { it.recordingId }) { row ->
-                    ProcessingCard(row = row, onRetry = { onRetry(row.recordingId) })
+                    ProcessingCard(
+                        row = row,
+                        onRetry = { onRetry(row.recordingId) },
+                        onDelete = { confirmDelete = row.recordingId },
+                    )
                 }
             }
 
             state.groups.forEach { group ->
                 item { DayGroupHeader(group.header) }
                 items(group.notes, key = { it.id }) { row ->
-                    NoteCard(row = row, onClick = { onNoteClick(row.id) })
+                    NoteCard(
+                        row = row,
+                        onClick = { onNoteClick(row.id) },
+                        onDelete = { confirmDelete = row.recordingId },
+                    )
                 }
             }
 
@@ -116,6 +132,24 @@ internal fun LibraryContent(
                 item { EmptyLibrary() }
             }
         }
+    }
+
+    confirmDelete?.let { recId ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            title = { Text("Delete recording?") },
+            text = { Text("This permanently removes the note, transcript and the audio file. This cannot be undone.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    onDelete(recId)
+                    confirmDelete = null
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirmDelete = null }) { Text("Cancel") }
+            },
+            shape = androidx.compose.ui.graphics.RectangleShape,
+        )
     }
 }
 
@@ -144,17 +178,26 @@ private fun EmptyLibrary() {
 }
 
 @Composable
-private fun ProcessingCard(row: ProcessingRow, onRetry: () -> Unit) {
+private fun ProcessingCard(row: ProcessingRow, onRetry: () -> Unit, onDelete: () -> Unit) {
     val colors = VaaniTheme.colors
     VaaniCard(onClick = if (row.isFailed) onRetry else ({})) {
         Column(Modifier.fillMaxWidth()) {
-            Text(
-                text = row.title,
-                color = colors.ink,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.Top) {
+                Text(
+                    text = row.title,
+                    color = colors.ink,
+                    style = MaterialTheme.typography.titleLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(
+                    Modifier.size(32.dp).clickable(onClick = onDelete),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    VaaniIconView(VaaniIcon.Trash, tint = colors.muted, size = 18.dp)
+                }
+            }
             Text(
                 text = row.meta,
                 color = colors.muted,
@@ -221,7 +264,7 @@ private fun SyncBanner(sync: SyncBannerState) {
 }
 
 @Composable
-private fun NoteCard(row: NoteRow, onClick: () -> Unit) {
+private fun NoteCard(row: NoteRow, onClick: () -> Unit, onDelete: () -> Unit) {
     val colors = VaaniTheme.colors
     VaaniCard(onClick = onClick) {
         Column(Modifier.fillMaxWidth()) {
@@ -235,6 +278,12 @@ private fun NoteCard(row: NoteRow, onClick: () -> Unit) {
                     modifier = Modifier.weight(1f),
                 )
                 Text(row.durationLabel, color = colors.muted, style = MonoStyle)
+                Box(
+                    Modifier.padding(start = 8.dp).size(28.dp).clickable(onClick = onDelete),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    VaaniIconView(VaaniIcon.Trash, tint = colors.muted, size = 16.dp)
+                }
             }
             Text(
                 text = row.snippet,
@@ -280,9 +329,9 @@ private fun previewState() = LibraryUiState(
         DayGroup(
             "TODAY",
             listOf(
-                NoteRow("n1", "Standup with Ravi & Priya", "Pushed Atlas to next sprint…",
+                NoteRow("n1", "rec-n1", "Standup with Ravi & Priya", "Pushed Atlas to next sprint…",
                     "14:20  ·  3 speakers  ·  #atlas", "14:20", "Ready", ChipVariant.Sage, 2),
-                NoteRow("n2", "Call with vendor", "Transcribing 8 min of audio…",
+                NoteRow("n2", "rec-n2", "Call with vendor", "Transcribing 8 min of audio…",
                     "08:03", "08:03", "Transcribing 62%", ChipVariant.Coffee, 1),
             ),
         ),

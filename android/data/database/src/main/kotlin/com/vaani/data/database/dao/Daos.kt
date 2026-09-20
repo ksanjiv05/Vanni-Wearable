@@ -72,6 +72,10 @@ interface NoteDao {
 
     @Query("UPDATE note SET pipelineState = :state, pipelineProgress = :progress WHERE id = :noteId")
     suspend fun setPipelineState(noteId: String, state: String, progress: Float?)
+
+    /** Delete the note for a recording; its children cascade (FK on note). */
+    @Query("DELETE FROM note WHERE recordingId = :recordingId")
+    suspend fun deleteNoteByRecording(recordingId: String)
 }
 
 @Dao
@@ -92,6 +96,10 @@ interface RecordingDao {
 
     @Query("UPDATE recording SET pipelineState = :state WHERE id = :recordingId")
     suspend fun setPipelineState(recordingId: String, state: String)
+
+    /** Delete a recording row; transcript + segments cascade (FK on transcript). */
+    @Query("DELETE FROM recording WHERE id = :id")
+    suspend fun deleteById(id: String)
 }
 
 @Dao

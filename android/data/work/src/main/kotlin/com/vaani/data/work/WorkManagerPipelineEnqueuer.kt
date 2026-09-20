@@ -15,21 +15,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * WorkManager-backed [PipelineEnqueuer].
+ * WorkManager-backed [PipelineEnqueuer]. One unique work PER RECORDING (keyed by
+ * id) with [ExistingWorkPolicy.KEEP], so each recording is retried/enqueued
+ * INDEPENDENTLY — retrying one failed recording never disturbs the others.
  *
- * All transcribe→enrich→note work runs on ONE serial queue (a single unique-work
- * chain, [PIPELINE_QUEUE], with [ExistingWorkPolicy.APPEND_OR_REPLACE]) so recordings
- * process STRICTLY ONE AT A TIME. This is deliberate: the on-device LLM enricher
- * (MediaPipe/Gemma) mmaps hundreds of MB per instance, so letting WorkManager run
- * several recordings' workers in parallel (the default when each has its own unique
- * name) loads multiple LLM engines at once and OOM-crashes the whole process — seen
- * when syncing a batch of wearable recordings at once. Serialising bounds peak memory
- * to a single inference at a time.
- *
- * Idempotency: the worker no-ops a recording already READY, and APPEND_OR_REPLACE keeps
- * the queue intact, so re-enqueueing the same id just adds another (cheap, self-skipping)
- * node rather than running duplicates concurrently. Exponential backoff on retry; no
- * network constraint (LOCAL works offline; the API backend surfaces its own error).
+ * Memory safety (the batch-sync OOM) is handled NOT by coupling all work into one
+ * queue (that made "retry one" restart everything), but by a global mutex inside
+ * [com.vaani.data.pipeline.IngestPipeline] that serialises the heavy ASR+LLM section
+ * — so parallel workers simply wait their turn and at most one inference is resident.
  */
 @Singleton
 class WorkManagerPipelineEnqueuer @Inject constructor(
@@ -44,26 +37,21 @@ class WorkManagerPipelineEnqueuer @Inject constructor(
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.NOT_REQUIRED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .addTag(TAG)
-            .addTag(tagFor(recordingId))
             .build()
-        // APPEND to the single serial queue: each recording waits for the previous to
-        // finish, so at most one LLM inference is resident at a time.
         workManager.enqueueUniqueWork(
-            PIPELINE_QUEUE,
-            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            uniqueName(recordingId),
+            ExistingWorkPolicy.KEEP,
             request,
         )
     }
 
     override fun cancel(recordingId: String) {
-        // Cancel just this recording's node by its per-id tag (the queue itself lives on).
-        workManager.cancelAllWorkByTag(tagFor(recordingId))
+        workManager.cancelUniqueWork(uniqueName(recordingId))
     }
 
-    private fun tagFor(recordingId: String) = TranscriptionWorker.WORK_NAME_PREFIX + recordingId
+    private fun uniqueName(recordingId: String) = TranscriptionWorker.WORK_NAME_PREFIX + recordingId
 
     private companion object {
         const val TAG = "vaani-transcription"
-        const val PIPELINE_QUEUE = "vaani-pipeline-queue"
     }
 }

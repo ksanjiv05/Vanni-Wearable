@@ -17,6 +17,8 @@ import com.vaani.domain.model.TodoStatus
 import com.vaani.domain.model.Transcript
 import com.vaani.domain.model.TranscriptSegment
 import com.vaani.domain.repository.NotesWriter
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -48,8 +50,18 @@ class IngestPipeline @Inject constructor(
      * Process a single recording end-to-end. Returns the persisted [Note] on
      * success. Any stage failure marks the note FAILED and returns the error;
      * the recording row is never left in a half-transcribed limbo.
+     *
+     * The whole ASR+enrich body runs under [inferenceLock] so that even when
+     * WorkManager runs several recordings' workers in parallel (batch sync), only
+     * ONE recording is doing heavy on-device inference at a time. This bounds peak
+     * memory to a single Whisper + a single MediaPipe/Gemma instance — loading
+     * several LLM engines at once was OOM-crashing the process mid-batch. Retries
+     * stay independent (per-recording work), they just queue on this lock.
      */
-    suspend fun process(audio: AudioRef, opts: PipelineOptions = PipelineOptions()): Outcome<Note> {
+    suspend fun process(audio: AudioRef, opts: PipelineOptions = PipelineOptions()): Outcome<Note> =
+        inferenceLock.withLock { processLocked(audio, opts) }
+
+    private suspend fun processLocked(audio: AudioRef, opts: PipelineOptions): Outcome<Note> {
         // Resolve the ASR engine BEFORE marking TRANSCRIBING: a missing/unsupported
         // backend must fail cleanly, never crash and never strand the recording
         // mid-state. Router resolution is typed (Outcome), so it routes through fail().
@@ -196,3 +208,9 @@ class IngestPipeline @Inject constructor(
 data class PipelineOptions(
     val asr: AsrOptions = AsrOptions(),
 )
+
+/**
+ * Process-global lock serialising heavy on-device inference across ALL pipeline
+ * instances/workers, so a batch sync never loads several LLM engines at once.
+ */
+private val inferenceLock = Mutex()

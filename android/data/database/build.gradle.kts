@@ -9,6 +9,7 @@ android {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(project(":data:audio"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.core)

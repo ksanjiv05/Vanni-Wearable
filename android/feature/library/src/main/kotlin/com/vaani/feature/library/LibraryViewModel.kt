@@ -28,11 +28,23 @@ import kotlin.math.roundToInt
 class LibraryViewModel @Inject constructor(
     repository: NotesRepository,
     private val enqueuer: com.vaani.domain.pipeline.PipelineEnqueuer,
+    private val writer: com.vaani.domain.repository.NotesWriter,
 ) : ViewModel() {
 
     /** Re-run the ingest pipeline for a failed recording (tap-to-retry). */
     fun retry(recordingId: String) {
         viewModelScope.launch { enqueuer.enqueue(recordingId) }
+    }
+
+    /**
+     * Permanently delete a recording, its note/transcript, and the audio blob.
+     * Cancels any in-flight pipeline work for it first so it can't resurrect.
+     */
+    fun delete(recordingId: String) {
+        viewModelScope.launch {
+            enqueuer.cancel(recordingId)
+            writer.deleteRecording(recordingId)
+        }
     }
 
     val uiState: StateFlow<LibraryUiState> =
@@ -114,6 +126,7 @@ class LibraryViewModel @Inject constructor(
         }
         return NoteRow(
             id = id,
+            recordingId = recordingId,
             title = title,
             snippet = summaryShort,
             meta = metaParts.joinToString("  ·  "),

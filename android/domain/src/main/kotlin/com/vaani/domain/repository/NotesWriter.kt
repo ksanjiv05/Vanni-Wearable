@@ -31,4 +31,13 @@ interface NotesWriter {
      * [completedAtEpochMs] is the moment it was marked DONE (null when reopened).
      */
     suspend fun setTodoStatus(todoId: String, status: TodoStatus, completedAtEpochMs: Long?)
+
+    /**
+     * Permanently delete a recording and everything derived from it — the note,
+     * transcript, key points, todos, tag/entity links (all cascade in the DB) AND
+     * the stored audio blob on disk. Returns the deleted recording's sha256 (or
+     * null if there was no such recording) so callers can also drop the on-device
+     * (wearable SD) copy if desired.
+     */
+    suspend fun deleteRecording(recordingId: String): String?
 }

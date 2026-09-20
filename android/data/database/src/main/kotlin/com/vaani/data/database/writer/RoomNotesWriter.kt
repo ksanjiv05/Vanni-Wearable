@@ -1,6 +1,7 @@
 package com.vaani.data.database.writer
 
 import androidx.room.withTransaction
+import com.vaani.data.audio.AudioBlobStore
 import com.vaani.data.database.VaaniDatabase
 import com.vaani.data.database.mapper.toCrossRef
 import com.vaani.data.database.mapper.toEntity
@@ -22,6 +23,7 @@ import javax.inject.Singleton
 @Singleton
 class RoomNotesWriter @Inject constructor(
     private val db: VaaniDatabase,
+    private val blobStore: AudioBlobStore,
 ) : NotesWriter {
 
     override suspend fun upsertNote(note: Note, transcript: Transcript?) {
@@ -66,5 +68,18 @@ class RoomNotesWriter @Inject constructor(
 
     override suspend fun setTodoStatus(todoId: String, status: TodoStatus, completedAtEpochMs: Long?) {
         db.noteDao().setTodoStatus(todoId, status.name, completedAtEpochMs)
+    }
+
+    override suspend fun deleteRecording(recordingId: String): String? {
+        val sha = db.recordingDao().findById(recordingId)?.sha256
+        db.withTransaction {
+            // Note has no FK to recording, so delete it explicitly (its children
+            // cascade); the recording delete cascades its transcript + segments.
+            db.noteDao().deleteNoteByRecording(recordingId)
+            db.recordingDao().deleteById(recordingId)
+        }
+        // Drop the on-disk audio blob too (content-addressed by sha256).
+        if (sha != null) runCatching { blobStore.delete(sha) }
+        return sha
     }
 }

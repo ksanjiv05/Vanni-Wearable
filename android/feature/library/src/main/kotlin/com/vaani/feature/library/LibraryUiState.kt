@@ -30,6 +30,7 @@ data class DayGroup(
 /** A single note card's presentation model. */
 data class NoteRow(
     val id: String,
+    val recordingId: String,
     val title: String,
     val snippet: String,
     val meta: String,
