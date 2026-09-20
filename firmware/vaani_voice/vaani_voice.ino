@@ -162,9 +162,9 @@ void setup() {
   // Explicit hardware reset pulse — a warm reset (after flashing) sometimes leaves the ST7735
   // uninitialized (white screen) unless it gets a full RST low->high cycle + settle time.
   pinMode(TFT_RST, OUTPUT);
-  digitalWrite(TFT_RST, HIGH); delay(20);
-  digitalWrite(TFT_RST, LOW);  delay(20);
-  digitalWrite(TFT_RST, HIGH); delay(150);
+  digitalWrite(TFT_RST, HIGH); delay(50);
+  digitalWrite(TFT_RST, LOW);  delay(200);
+  digitalWrite(TFT_RST, HIGH); delay(300);
   spiBus.begin(TFT_SCLK, TFT_MISO, TFT_MOSI, -1);
   tft.initR(INITR_BLACKTAB); tft.setSPISpeed(20000000); tft.setRotation(1);
   tft.fillScreen(ST77XX_BLACK);
