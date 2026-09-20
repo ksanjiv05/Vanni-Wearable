@@ -35,6 +35,11 @@ internal class MediaPipeLlm(private val context: Context) {
     /**
      * Run [prompt] through the model at [modelPath], returning the raw completion
      * or null on any failure. [maxTokens] caps the total context+output budget.
+     *
+     * The engine is CLOSED after every run (not cached): [LlmInference] mmaps hundreds
+     * of MB, so holding it resident across notes — especially while a batch of recordings
+     * is being processed — blows past the memory budget and OOM-crashes the process.
+     * Reload cost is negligible next to the inference itself (inference is seconds-to-minutes).
      */
     @Synchronized
     fun runOrNull(modelPath: String, prompt: String, maxTokens: Int = 1024): String? {
@@ -44,6 +49,11 @@ internal class MediaPipeLlm(private val context: Context) {
         } catch (t: Throwable) {
             Log.e(TAG, "generateResponse failed", t)
             null
+        } finally {
+            // Free the mmap immediately so peak memory stays at one inference.
+            runCatching { eng.close() }
+            engine = null
+            loadedPath = null
         }
     }
 
