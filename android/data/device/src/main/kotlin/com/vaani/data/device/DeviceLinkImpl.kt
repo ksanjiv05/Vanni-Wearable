@@ -76,11 +76,24 @@ class DeviceLinkImpl @Inject constructor(
             _status.value = LinkStatus(LinkState.ERROR, message = "Could not pair over Bluetooth")
             return@withContext Outcome.Err(AppError.Network("BLE pairing failed"))
         }
-        // Provision secrets over the encrypted link.
-        val creds = runCatching {
-            ble.command("CRED")?.toString(Charsets.UTF_8)?.let { parseCreds(it) }
-        }.getOrNull()
-        val bleInfo = ble.command("INFO")?.toString(Charsets.UTF_8)?.let { parseInfo(it, LinkTransport.BLE) }
+        // Provision secrets over the encrypted link. On a bonded reconnect the LE encryption can
+        // still be settling for the first ~1-2s ("SMP state machine busy"), so the first encrypted
+        // read may return null. Retry CRED+INFO a few times before giving up — this is the difference
+        // between "No device info after pairing" and a clean connect.
+        var creds: Creds? = null
+        var bleInfo: DeviceInfo? = null
+        for (attempt in 0 until 5) {
+            if (creds == null) {
+                creds = runCatching {
+                    ble.command("CRED")?.toString(Charsets.UTF_8)?.let { parseCreds(it) }
+                }.getOrNull()
+            }
+            if (bleInfo == null) {
+                bleInfo = ble.command("INFO")?.toString(Charsets.UTF_8)?.let { parseInfo(it, LinkTransport.BLE) }
+            }
+            if (bleInfo != null) break
+            kotlinx.coroutines.delay(700)   // let encryption finish, then retry the encrypted read
+        }
         if (bleInfo == null) {
             ble.disconnect()
             _status.value = LinkStatus(LinkState.ERROR, message = "No response from wearable")

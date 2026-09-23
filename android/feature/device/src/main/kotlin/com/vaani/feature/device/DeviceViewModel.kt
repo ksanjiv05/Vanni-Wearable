@@ -89,9 +89,27 @@ class DeviceViewModel @Inject constructor(
             if (_ui.value.state == LinkState.CONNECTED) {
                 refreshFiles()
                 startDashboardHeartbeat()
+                // Auto-sync: pull any recordings the wearable captured hands-free straight into the
+                // Library pipeline, so the user never has to remember the Sync button. Idempotent
+                // (blob store dedupes by SHA), so re-connecting won't duplicate already-imported notes.
+                autoSyncIfRecordings()
             }
         }
     }
+
+    /** After connect, if the wearable has audio in /vaani, kick off a sync automatically. */
+    private fun autoSyncIfRecordings() {
+        viewModelScope.launch {
+            val hasAudio = when (val r = link.listRecordings()) {
+                is Outcome.Ok -> r.value.any { !it.isDir && isAudio(it.name) }
+                is Outcome.Err -> false
+            }
+            if (hasAudio && !_ui.value.syncing) syncRecordings()
+        }
+    }
+
+    private fun isAudio(name: String): Boolean =
+        name.substringAfterLast('.', "").lowercase() in setOf("wav", "m4a", "mp3", "aac", "opus", "ogg", "flac")
 
     /**
      * Push a glanceable dashboard to the wearable's screen: app-linked flag, count of recordings
