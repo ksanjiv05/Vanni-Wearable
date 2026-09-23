@@ -14,3 +14,7 @@ android/.kotlin/
 # python
 __pycache__/
 *.pyc
+
+# Release signing (NEVER commit)
+keystore/*.jks
+keystore/keystore.properties

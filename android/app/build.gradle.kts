@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("vaani.android.application")
     id("vaani.android.compose")
@@ -6,6 +8,23 @@ plugins {
 
 android {
     namespace = "com.vaani.app"
+
+    signingConfigs {
+        create("release") {
+            // Loaded from keystore/keystore.properties (gitignored — never committed).
+            val props = Properties().apply {
+                val propsFile = rootProject.file("../keystore/keystore.properties")
+                if (propsFile.exists()) propsFile.inputStream().use { load(it) }
+            }
+            val propsFile = rootProject.file("../keystore/keystore.properties")
+            if (propsFile.exists()) {
+                storeFile = rootProject.file("../keystore/vaani-release.jks")
+                storePassword = props.getProperty("storePassword")
+                keyAlias = props.getProperty("keyAlias")
+                keyPassword = props.getProperty("keyPassword")
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.vaani.app"
@@ -19,6 +38,7 @@ android {
 
     buildTypes {
         release {
+            signingConfig = signingConfigs.getByName("release")
             // Shrink + obfuscate: the app pulls in sherpa-onnx, MediaPipe, Room, Hilt,
             // WorkManager, Media3, commons-compress — R8 meaningfully cuts APK size.
             isMinifyEnabled = true
