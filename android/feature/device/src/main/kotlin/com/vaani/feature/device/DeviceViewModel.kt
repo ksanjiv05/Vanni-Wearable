@@ -58,6 +58,12 @@ class DeviceViewModel @Inject constructor(
                     deviceName = s.deviceName ?: _ui.value.deviceName,
                     message = s.message,
                 )
+                // Returning to this screen while the (app-scoped) link is still CONNECTED: rebuild
+                // the file list + resume the dashboard heartbeat that was cancelled when we left.
+                if (s.state == LinkState.CONNECTED && heartbeatJob?.isActive != true) {
+                    refreshFiles()
+                    startDashboardHeartbeat()
+                }
             }
         }
     }
@@ -263,12 +269,13 @@ class DeviceViewModel @Inject constructor(
 
     fun clearMessage() { _ui.value = _ui.value.copy(message = null) }
 
-    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
     override fun onCleared() {
-        // P0: release the link when the screen goes away, or the BLE connection / bound Wi-Fi
-        // socket factory leaks past the ViewModel. Use an app-scope launch since viewModelScope
-        // is already cancelled at onCleared.
-        kotlinx.coroutines.GlobalScope.launch { runCatching { link.disconnect() } }
+        // Do NOT disconnect the wearable here. DeviceLink is an app-scoped @Singleton, so the
+        // connection is meant to persist across screen navigation (Library <-> Device) — tearing it
+        // down on every screen-leave forced a re-scan/re-pair each return. The heartbeat job lives in
+        // viewModelScope so it cancels automatically; the app-scoped link keeps the connection, and
+        // the next DeviceViewModel re-reads CONNECTED from link.status() and resumes the heartbeat.
+        // The connection is released explicitly by the Disconnect button (or when the link drops).
     }
 
     private fun errText(e: Outcome.Err): String = when (val err = e.error) {
